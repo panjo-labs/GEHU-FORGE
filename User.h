@@ -1,157 +1,119 @@
-#pragma once // HEADER GUARD: Prevents duplicate definitions across multiple translation units
+#pragma once
 
 #include <iostream>
 #include <string>
-#include <vector>
-#include <unordered_set>
 #include "Achievement.h"
+#include "ds/DynArray.h"
+#include "ds/HashSet.h"
 
 // ============================================================================
-// BASE CLASS: User (OOP: Abstraction & Inheritance Base)
+// ABSTRACT BASE CLASS: User
 // ============================================================================
-// Represents a generic system user. Provides foundational identity fields.
+// Holds what EVERY account has (name, email). It is abstract because of the
+// pure virtual getRole(): you must create a concrete kind of user (Student).
 class User {
 protected:
-    // 'protected': Accessible within derived classes (like Student), inaccessible externally.
+    // 'protected': derived classes can use these, outside code cannot.
+    std::string name;
     std::string email;
 
 public:
-    // CONSTRUCTOR: Uses Member Initializer List for direct initialization (avoids extra copies)
-    User(std::string email) : email(email) {}
+    User(const std::string& name, const std::string& email) : name(name), email(email) {}
 
-    // VIRTUAL DESTRUCTOR (CRITICAL OOP CONCEPT):
-    // Prevents memory leaks and undefined behavior when deleting a derived object 
-    // through a base class pointer (e.g., User* u = new Student(...); delete u;).
+    // VIRTUAL DESTRUCTOR: safe deletion through a User* (see Achievement.h).
     virtual ~User() {}
 
-    // GETTER: Marked 'const' indicating it does not alter object state.
-    // Time Complexity:  O(1)
-    // Space Complexity: O(1)
-    std::string getEmail() const { return email; }
+    // Pure virtual: each kind of user reports its own role (polymorphism).
+    virtual std::string getRole() const = 0;
+
+    const std::string& getName() const  { return name; }
+    const std::string& getEmail() const { return email; }
 };
 
 // ============================================================================
-// DERIVED CLASS: Student (OOP: Inheritance & Composition)
+// DERIVED CLASS: Student   ("a Student IS-A User")
 // ============================================================================
-// Inherits public/protected members from User and manages specialized student data.
+// COMPOSITION ("has-a"): a Student HAS-A HashSet of skills and HAS-A DynArray
+// of achievements.
 class Student : public User {
 private:
-    int studentId;          // Unique Primary Key used by RankEngine for O(1) hash lookups
-    std::string name;
+    int studentId;                       // unique key used by every HashMap in the project
     std::string branch;
     int graduationYear;
-
-    // ------------------------------------------------------------------------
-    // DATA STRUCTURE: std::unordered_set<std::string>
-    // ------------------------------------------------------------------------
-    // WHY USED:
-    // 1. Implemented as a Hash Table: Guarantees no duplicate skills are stored.
-    // 2. Performance:
-    //    - Insertion: O(1) average, O(N) worst-case (hash collision)
-    //    - Search:    O(1) average
-    //    - Deletion:  O(1) average
-    // 3. Space Complexity: O(S) where S is the number of distinct skills.
-    std::unordered_set<std::string> skills;
-
     std::string githubHandle;
     std::string leetcodeHandle;
 
-    // ------------------------------------------------------------------------
-    // DATA STRUCTURE: std::vector<Achievement*>
-    // ------------------------------------------------------------------------
-    // WHY USED:
-    // 1. Dynamic contiguous array storing BASE CLASS POINTERS (Achievement*).
-    // 2. Enables POLYMORPHISM (Heterogeneous collection storing CodingAchievement,
-    //    CertificateAchievement, InternshipAchievement without Object Slicing).
-    // 3. Performance:
-    //    - Insertion (push_back): O(1) amortized time
-    //    - Traversal:             O(A) where A is count of achievements (cache-friendly)
-    // 4. Space Complexity: O(A) pointers.
-    std::vector<Achievement*> achievements;
+    HashSet<std::string> skills;         // duplicate-free, O(1) add/contains/remove
+
+    // NON-OWNING pointers: the DataStore creates and deletes every Achievement.
+    // Student only REMEMBERS them, so it must never call delete on them.
+    DynArray<Achievement*> achievements;
 
 public:
-    // CONSTRUCTOR:
-    // Delegates email initialization to base User constructor via initializer list.
-    Student(int id, std::string name, std::string email, std::string branch, int year)
-        : User(email), studentId(id), name(name), branch(branch), graduationYear(year) {}
+    // The initializer list calls the base-class constructor User(name, email).
+    Student(int id, const std::string& name, const std::string& email,
+            const std::string& branch, int graduationYear)
+        : User(name, email), studentId(id), branch(branch), graduationYear(graduationYear) {}
 
-    // ------------------------------------------------------------------------
-    // SKILL MANAGEMENT API
-    // ------------------------------------------------------------------------
-    // Time Complexity:  O(1) Average
-    // Space Complexity: O(1) per unique skill added
-    void addSkill(const std::string& skill) { skills.insert(skill); }
+    std::string getRole() const override { return "Student"; }
 
-    // Time Complexity:  O(1) Average
-    // Space Complexity: O(1)
-    void removeSkill(const std::string& skill) { skills.erase(skill); }
+    // ---- skills ------------------------------------------------------------
+    bool addSkill(const std::string& skill)       { return skills.add(skill); }
+    bool removeSkill(const std::string& skill)    { return skills.remove(skill); }
+    bool hasSkill(const std::string& skill) const { return skills.contains(skill); }
+    // 'const reference' return: gives access WITHOUT copying the whole set.
+    const HashSet<std::string>& getSkills() const { return skills; }
 
-    // ------------------------------------------------------------------------
-    // SETTERS (Encapsulation)
-    // ------------------------------------------------------------------------
-    void setGithub(const std::string& github) { githubHandle = github; }
-    void setLeetcode(const std::string& leetcode) { leetcodeHandle = leetcode; }
-
-    // ------------------------------------------------------------------------
-    // GETTERS
-    // ------------------------------------------------------------------------
+    // ---- simple getters / setters (ENCAPSULATION) ---------------------------
     int getStudentId() const { return studentId; }
-    std::string getName() const { return name; }
-    std::string getBranch() const { return branch; }
+    const std::string& getBranch() const { return branch; }
     int getGraduationYear() const { return graduationYear; }
-    std::string getGithub() const { return githubHandle; }
-    std::string getLeetcode() const { return leetcodeHandle; }
+    const std::string& getGithub() const { return githubHandle; }
+    const std::string& getLeetcode() const { return leetcodeHandle; }
+    void setGithub(const std::string& g) { githubHandle = g; }
+    void setLeetcode(const std::string& l) { leetcodeHandle = l; }
 
-    // Returning 'const reference' avoids expensive deep copies of the hash set.
-    // Time Complexity:  O(1)
-    // Space Complexity: O(1) (No memory allocation)
-    const std::unordered_set<std::string>& getSkills() const { return skills; }
-
-    // ------------------------------------------------------------------------
-    // ACHIEVEMENT INTEGRATION
-    // ------------------------------------------------------------------------
-    // Links an achievement to this student's profile.
-    // Time Complexity:  O(1) amortized
-    // Space Complexity: O(1)
-    void addAchievement(Achievement* ach) {
-        if (ach != nullptr) {
-            achievements.push_back(ach);
+    // ---- achievements -------------------------------------------------------
+    // Remember an achievement. Ignores nullptr and ids already linked.  O(A)
+    void linkAchievement(Achievement* a) {
+        if (a == nullptr) return;
+        for (int i = 0; i < achievements.size(); ++i) {
+            if (achievements[i]->getId() == a->getId()) return;
         }
+        achievements.push_back(a);
     }
+    const DynArray<Achievement*>& getAchievements() const { return achievements; }
 
-    // Returns const reference to avoid vector copying
-    // Time Complexity:  O(1)
-    // Space Complexity: O(1)
-    const std::vector<Achievement*>& getAchievements() const {
-        return achievements;
-    }
+    // ---- profile card (view) -------------------------------------------------
+    // Prints identity, skills and every achievement.  O(S + A)
+    void printProfileCard(int rank, double exp, const std::string& tier) const {
+        std::cout << "\n==================== GEHU FORGE PROFILE ====================\n";
+        std::cout << "Student ID : " << studentId << "\n";
+        std::cout << "Name       : " << name << "\n";
+        std::cout << "Email      : " << email << "\n";
+        std::cout << "Branch     : " << branch << "  (Batch " << graduationYear << ")\n";
+        std::cout << "GitHub     : " << (githubHandle.empty() ? "N/A" : githubHandle) << "\n";
+        std::cout << "LeetCode   : " << (leetcodeHandle.empty() ? "N/A" : leetcodeHandle) << "\n";
 
-    // ------------------------------------------------------------------------
-    // VIEW / PRESENTATION METHOD
-    // ------------------------------------------------------------------------
-    // Traverses skills and achievements for formatted profile display.
-    // Time Complexity:  O(S + A) where S = skills count, A = achievements count
-    // Space Complexity: O(1) auxiliary
-    void displayProfile() const {
-        std::cout << "\n========================================\n";
-        std::cout << "           GEU FORGE PROFILE            \n";
-        std::cout << "========================================\n";
-        std::cout << "Student ID:      " << studentId << std::endl;
-        std::cout << "Name:            " << name << std::endl;
-        std::cout << "Email:           " << email << std::endl;
-        std::cout << "Branch:          " << branch << std::endl;
-        std::cout << "Graduation Year: " << graduationYear << std::endl;
-        std::cout << "GitHub:          " << (githubHandle.empty() ? "N/A" : githubHandle) << std::endl;
-        std::cout << "LeetCode:        " << (leetcodeHandle.empty() ? "N/A" : leetcodeHandle) << std::endl;
-        std::cout << "Skills:          ";
-        if (skills.empty()) {
-            std::cout << "None listed";
+        std::cout << "Skills     : ";
+        if (skills.size() == 0) {
+            std::cout << "none listed";
         } else {
-            for (const auto& skill : skills) {
-                std::cout << "[" << skill << "] ";
-            }
+            skills.forEach([](const std::string& s) { std::cout << "[" << s << "] "; });
         }
-        std::cout << "\nTotal Logged Achievements: " << achievements.size() << std::endl;
-        std::cout << "========================================\n";
+        std::cout << "\n";
+
+        if (rank > 0) {
+            std::cout << "Rank       : #" << rank << "   EXP: " << exp << "   Tier: " << tier << "\n";
+        } else {
+            std::cout << "Rank       : unranked (no approved achievements yet)\n";
+        }
+
+        std::cout << "Achievements (" << achievements.size() << "):\n";
+        for (int i = 0; i < achievements.size(); ++i) {
+            // POLYMORPHISM: display() of the real derived type runs here.
+            achievements[i]->display();
+        }
+        std::cout << "============================================================\n";
     }
 };

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>GEHU Forge - Saksham Study Guide</title>
+<style>
+@page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+* { box-sizing: border-box; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11pt; line-height: 1.42; color: #1b1f24; margin: 0; }
+h1 { font-size: 24pt; margin: 0 0 6pt; color: #0b3d63; }
+h2 { font-size: 16pt; color: #0b3d63; border-bottom: 2px solid #0b3d63; padding-bottom: 3pt; margin: 20pt 0 8pt; page-break-after: avoid; }
+h3 { font-size: 12.5pt; color: #8a3b00; margin: 14pt 0 4pt; page-break-after: avoid; }
+h4 { font-size: 11pt; margin: 8pt 0 2pt; color: #0b3d63; page-break-after: avoid; }
+p { margin: 4pt 0 6pt; }
+ul, ol { margin: 3pt 0 7pt; padding-left: 20pt; }
+li { margin-bottom: 2pt; }
+code { font-family: Consolas, "Courier New", monospace; font-size: 9.8pt; background: #eef1f4; padding: 0 2pt; border-radius: 2pt; }
+pre { font-family: Consolas, "Courier New", monospace; font-size: 9pt; line-height: 1.3; background: #f4f6f8; border: 1px solid #c9d1d9; border-left: 4px solid #0b3d63; padding: 6pt 8pt; margin: 6pt 0 9pt; white-space: pre-wrap; page-break-inside: avoid; }
+table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 10pt; page-break-inside: avoid; }
+th { background: #0b3d63; color: #fff; text-align: left; padding: 4pt 6pt; }
+td { border: 1px solid #c9d1d9; padding: 4pt 6pt; vertical-align: top; }
+tr.me td { background: #fff1c7; font-weight: 600; }
+.box { border: 1px solid #9bb7d0; background: #eaf3fb; border-radius: 4pt; padding: 6pt 9pt; margin: 7pt 0; page-break-inside: avoid; }
+.why { border-color: #e0b36a; background: #fff6e3; }
+.warn { border-color: #d99; background: #fdeeee; }
+.ok { border-color: #8cc59a; background: #ecf8ef; }
+.box b.t { display: block; margin-bottom: 2pt; }
+.cover { text-align: center; padding-top: 70mm; page-break-after: always; }
+.cover .big { font-size: 34pt; font-weight: 700; color: #0b3d63; }
+.cover .sub { font-size: 15pt; margin-top: 8pt; color: #444; }
+.cover .who { margin-top: 30pt; font-size: 17pt; }
+.cover .role { margin-top: 6pt; font-size: 12pt; color: #333; }
+.pb { page-break-before: always; }
+svg { display: block; margin: 6pt auto; max-width: 100%; page-break-inside: avoid; }
+.fig { page-break-inside: avoid; }
+.q { page-break-inside: avoid; margin-bottom: 7pt; }
+.q .qq { font-weight: 700; color: #0b3d63; }
+.small { font-size: 9.5pt; color: #444; }
+</style></head><body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="big">GEHU Forge</div>
+  <div class="sub">Viva and Presentation Study Guide</div>
+  <div class="sub">GEHU Forge &ndash; Phase 2</div>
+  <div class="who"><b>Saksham Singh</b></div>
+  <div class="role">Role: custom data-structure foundations and persistence<br>
+  DynArray &bull; HashMap &bull; HashSet &bull; DataStore &bull; DataGenerator &bull; structure tests</div>
+  <div class="role" style="margin-top:40pt;font-size:10pt;color:#666">Written in simple English for a 2nd-year B.Tech reader. Every term is explained before it is used.<br>The last section holds the viva questions with short model answers.</div>
+</div>
+
+<!-- 1 PROJECT -->
+<h2 style="margin-top:0">1. The project in one page</h2>
+<h3>The problem</h3>
+<p>Colleges have many students doing coding contests, internships, certificates and open-source work. Today this proof is scattered and nobody can compare students fairly. <b>GEHU Forge</b> is a C++ program that collects each student's achievements, lets them be <b>verified</b> (approved or rejected), turns approved ones into a score called <b>EXP</b>, and keeps a live <b>ranking</b> (leaderboard) of students.</p>
+<h3>Why no STL?</h3>
+<p>STL (Standard Template Library) is C++'s ready-made toolbox: <code>vector</code>, <code>map</code>, <code>queue</code> and so on. This is a <b>Data Structures and Algorithms (DSA)</b> project, so using the toolbox would hide the very thing we must show. Rule of the project: <b>no STL containers</b>. We build our own. (<code>std::string</code>, <code>iostream</code>, <code>fstream</code>, <code>cmath</code> are still allowed. STL is used only inside tests, as an independent checker.)</p>
+<h3>The five custom structures</h3>
+<table>
+<tr><th>Structure</th><th>Owner</th><th>One-line job</th></tr>
+<tr class="me"><td>DynArray&lt;T&gt;</td><td>Saksham</td><td>A growable array (our own <code>vector</code>)</td></tr>
+<tr class="me"><td>HashMap&lt;K,V&gt;</td><td>Saksham</td><td>Look up a value by key in about O(1) (our own <code>unordered_map</code>)</td></tr>
+<tr class="me"><td>HashSet&lt;T&gt;</td><td>Saksham</td><td>A collection with no duplicates (built on HashMap)</td></tr>
+<tr><td>LinkedQueue&lt;T&gt;</td><td>Manya</td><td>First-come-first-served line for pending verifications</td></tr>
+<tr><td>AVLTree</td><td>Pranjal</td><td>Self-balancing sorted tree that keeps the leaderboard</td></tr>
+</table>
+<h3>What the program does</h3>
+<ul>
+<li>It has <b>100 synthetic (fake, computer-generated) students</b> and their achievements, stored in two <b>CSV</b> files (plain text tables: <code>data/students.csv</code> and <code>data/achievements.csv</code>). If the files are missing, they are generated.</li>
+<li>A <b>CLI</b> (command-line menu) lets you add students, submit achievements, review pending ones, and show the <b>Top 10</b> leaderboard.</li>
+<li>Saksham's part is the <b>foundation</b>: the three structures everyone else stores data in, plus loading, saving and generating the data.</li>
+</ul>
+<div class="box"><b class="t">Your one-sentence pitch</b>"I built the base layer: our own growable array, hash map and hash set, and the DataStore that owns every object and reads and writes the CSV files, plus the generator that makes 100 reproducible students, and tests that check my structures against the STL."</div>
+
+<!-- 3 ARCHITECTURE -->
+<h2 class="pb">2. System architecture and flow</h2>
+<p>Yellow/orange boxes are <b>Saksham's</b> parts. Everything else depends on them, because every lookup by id goes through his HashMap.</p>
+<div class="fig">
+<svg viewBox="0 0 640 430" width="640" height="430" font-family="Segoe UI,Arial" font-size="11">
+<defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#333"/></marker></defs>
+<rect x="150" y="5" width="340" height="38" rx="5" fill="#ffd27a" stroke="#c77a00" stroke-width="2"/>
+<text x="320" y="21" text-anchor="middle" font-weight="bold">data/students.csv + data/achievements.csv</text>
+<text x="320" y="36" text-anchor="middle">100 synthetic students, seed 2026 (Saksham: DataGenerator)</text>
+<line x1="320" y1="43" x2="320" y2="70" stroke="#333" marker-end="url(#a)"/>
+<text x="330" y="62" font-size="10">DataStore::loadFromCsv()</text>
+<rect x="120" y="72" width="400" height="58" rx="5" fill="#ffd27a" stroke="#c77a00" stroke-width="2"/>
+<text x="320" y="90" text-anchor="middle" font-weight="bold">DataStore (owns every object)</text>
+<text x="320" y="106" text-anchor="middle">HashMap&lt;int,Student*&gt;   HashMap&lt;int,Achievement*&gt;</text>
+<text x="320" y="121" text-anchor="middle">DynArray&lt;int&gt; studentOrder / achievementOrder</text>
+<line x1="320" y1="130" x2="320" y2="155" stroke="#333" marker-end="url(#a)"/>
+<text x="330" y="148" font-size="10">CLI: Submit achievement (Divyanshi)</text>
+<rect x="150" y="157" width="340" height="30" rx="5" fill="#dbe9f6" stroke="#4a7ba6"/>
+<text x="320" y="176" text-anchor="middle">Achievement object, status = Pending (Manya)</text>
+<line x1="320" y1="187" x2="320" y2="208" stroke="#333" marker-end="url(#a)"/>
+<text x="330" y="202" font-size="10">VerificationService::submit(a)</text>
+<rect x="150" y="210" width="340" height="30" rx="5" fill="#dbe9f6" stroke="#4a7ba6"/>
+<text x="320" y="229" text-anchor="middle">LinkedQueue&lt;int&gt;  (FIFO of achievement ids)</text>
+<line x1="320" y1="240" x2="320" y2="262" stroke="#333" marker-end="url(#a)"/>
+<text x="330" y="256" font-size="10">CLI "Review next": reviewNext(registry, approve)</text>
+<rect x="150" y="264" width="340" height="38" rx="5" fill="#ffd27a" stroke="#c77a00" stroke-width="2"/>
+<text x="320" y="280" text-anchor="middle">registry lookup = HashMap find, O(1) (Saksham)</text>
+<text x="320" y="295" text-anchor="middle">then approve() or reject()  (Manya)</text>
+<line x1="320" y1="302" x2="320" y2="322" stroke="#333" marker-end="url(#a)"/>
+<rect x="150" y="324" width="340" height="38" rx="5" fill="#dbe9f6" stroke="#4a7ba6"/>
+<text x="320" y="340" text-anchor="middle">RankEngine::applyAchievement (Pranjal)</text>
+<text x="320" y="355" text-anchor="middle" font-size="10">HashMap update O(1) + AVLTree erase+insert O(log N)</text>
+<line x1="320" y1="362" x2="320" y2="380" stroke="#333" marker-end="url(#a)"/>
+<rect x="150" y="382" width="340" height="38" rx="5" fill="#dbe9f6" stroke="#4a7ba6"/>
+<text x="320" y="398" text-anchor="middle">AVLTree leaderboard: getTopK(10), getRank(id)</text>
+<text x="320" y="413" text-anchor="middle" font-size="10">CLI prints leaderboard / profile card (Divyanshi)</text>
+</svg></div>
+<h3>The flow, step by step (from the design spec)</h3>
+<ol>
+<li><b>Load.</b> <code>DataStore::loadFromCsv()</code> reads the two CSV files (Saksham). If the files are missing, <code>DataGenerator</code> makes the data.</li>
+<li><b>Own.</b> <code>DataStore</code> owns the objects, held in <code>HashMap&lt;int,Student*&gt;</code> and <code>HashMap&lt;int,Achievement*&gt;</code>.</li>
+<li><b>Submit.</b> In the CLI, "Submit achievement" validates input and builds an Achievement object with status <i>Pending</i> (Divyanshi builds, Manya's class).</li>
+<li><b>Queue.</b> <code>VerificationService::submit(a)</code> puts the achievement's id into a <code>LinkedQueue&lt;int&gt;</code> (first-in, first-out).</li>
+<li><b>Review.</b> "Review next" calls <code>reviewNext(registry, approve)</code>. It finds the achievement in the HashMap, then calls <code>approve()</code> or <code>reject()</code>.</li>
+<li><b>Score.</b> <code>RankEngine::applyAchievement(student, ach)</code> (Pranjal) uses a score-once guard <code>tryConsumeForScoring()</code>, then: weighted points = base &times; categoryWeight &times; platformMultiplier &times; dailyDecay; raw score goes through log normalisation to EXP (0..10000).</li>
+<li><b>Update.</b> The HashMap is updated in O(1) and the AVLTree does erase + insert in O(log N).</li>
+<li><b>Show.</b> The leaderboard gives <code>getTopK(10)</code> in O(K + log N) and <code>getRank(id)</code> in O(log N). The CLI prints the leaderboard or profile card.</li>
+</ol>
+<h3>Who owns what</h3>
+<table>
+<tr><th>Member</th><th>Owns</th></tr>
+<tr><td>Pranjal</td><td>AVLTree (<code>ds/AVLTree.h</code>), RankEngine, and integration of the whole thing</td></tr>
+<tr><td>Manya</td><td>Achievement class hierarchy (<code>Achievement.h</code>), LinkedQueue (<code>ds/LinkedQueue.h</code>), VerificationService (<code>Verification.h</code>)</td></tr>
+<tr><td>Divyanshi</td><td>User / Student (<code>User.h</code>) and the CLI (<code>Cli.h</code>, <code>main.cpp</code>)</td></tr>
+<tr class="me"><td>Saksham (you)</td><td>DynArray, HashMap, HashSet (<code>ds/</code>), DataStore and DataGenerator (<code>Storage.h</code>), structure tests (<code>tests/test_structures.cpp</code>; <code>TestUtil.h</code> is shared)</td></tr>
+</table>
+
+<!-- 4 MODULES -->
+<h2 class="pb">3. Saksham's modules</h2>
+<p class="small">Build command: <code>g++ -std=c++17 -Wall -Wextra main.cpp -o forge.exe</code>. Run: <code>forge.exe</code> or <code>forge.exe --demo</code>.</p>
+
+<h3>3.1 DynArray&lt;T&gt; &ndash; a growable array</h3>
+<p><b>File:</b> <code>ds/DynArray.h</code>. <b>What it is:</b> an array that grows by itself when it gets full. It is our own version of <code>std::vector</code>.</p>
+<h4>Public API (from the spec)</h4>
+<table>
+<tr><th>Method</th><th>Meaning</th><th>Cost</th></tr>
+<tr><td><code>DynArray()</code></td><td>make empty array</td><td>O(1)</td></tr>
+<tr><td><code>DynArray(const DynArray&amp;)</code></td><td>copy constructor, deep copy</td><td>O(n)</td></tr>
+<tr><td><code>operator=(const DynArray&amp;)</code></td><td>copy assignment</td><td>O(n)</td></tr>
+<tr><td><code>~DynArray()</code></td><td>destructor, frees memory</td><td>O(1)</td></tr>
+<tr><td><code>void push_back(const T&amp;)</code></td><td>append at the end; capacity doubles when full, starting at 4</td><td>amortised O(1)</td></tr>
+<tr><td><code>T&amp; operator[](int i)</code> and const version</td><td>get element number i</td><td>O(1)</td></tr>
+<tr><td><code>size()</code>, <code>capacity()</code>, <code>empty()</code>, <code>clear()</code></td><td>how many items / room available / is it empty / forget all</td><td>O(1)</td></tr>
+<tr><td><code>bool removeAt(int i)</code></td><td>remove item i, shift the rest left</td><td>O(n)</td></tr>
+</table>
+
+<h4>Concept A: dynamic memory (<code>new</code> / <code>delete[]</code>)</h4>
+<p><b>(a) Definition.</b> Normal local variables live on the <b>stack</b> and have a fixed size decided at compile time. <b>Dynamic memory</b> lives on the <b>heap</b>: you ask for it while the program runs (<code>new T[n]</code>) and you must give it back (<code>delete[]</code>). Analogy: renting a storage room; you must return the key.</p>
+<p><b>(b) How it works.</b> DynArray keeps a pointer to a heap block, a <code>size</code> (items used) and a <code>capacity</code> (room available). When full, it asks for a bigger block, copies, and frees the old one:</p>
+<div class="fig"><svg viewBox="0 0 640 200" width="640" height="200" font-family="Consolas,monospace" font-size="11">
+<text x="5" y="14" font-family="Segoe UI" font-weight="bold">Capacity 4, full (size 4)</text>
+<g stroke="#333" fill="#cfe7ff"><rect x="10" y="20" width="30" height="24"/><rect x="40" y="20" width="30" height="24"/><rect x="70" y="20" width="30" height="24"/><rect x="100" y="20" width="30" height="24"/></g>
+<text x="20" y="37">1</text><text x="50" y="37">2</text><text x="80" y="37">3</text><text x="110" y="37">4</text>
+<text x="150" y="37" font-family="Segoe UI">push_back(5): no room!</text>
+<text x="5" y="70" font-family="Segoe UI" font-weight="bold">Step 1: new T[8]   Step 2: copy 4 items   Step 3: delete[] old block   Step 4: store 5</text>
+<g stroke="#333" fill="#ffd27a"><rect x="10" y="78" width="30" height="24"/><rect x="40" y="78" width="30" height="24"/><rect x="70" y="78" width="30" height="24"/><rect x="100" y="78" width="30" height="24"/><rect x="130" y="78" width="30" height="24"/></g>
+<g stroke="#333" fill="#fff"><rect x="160" y="78" width="30" height="24"/><rect x="190" y="78" width="30" height="24"/><rect x="220" y="78" width="30" height="24"/></g>
+<text x="20" y="95">1</text><text x="50" y="95">2</text><text x="80" y="95">3</text><text x="110" y="95">4</text><text x="140" y="95">5</text>
+<text x="260" y="95" font-family="Segoe UI">capacity 8, size 5</text>
+<text x="5" y="130" font-family="Segoe UI" font-weight="bold">Later at size 8 (full), the next push_back doubles again to 16</text>
+<g stroke="#333" fill="#ffd27a"><rect x="10" y="138" width="20" height="22"/><rect x="30" y="138" width="20" height="22"/><rect x="50" y="138" width="20" height="22"/><rect x="70" y="138" width="20" height="22"/><rect x="90" y="138" width="20" height="22"/><rect x="110" y="138" width="20" height="22"/><rect x="130" y="138" width="20" height="22"/><rect x="150" y="138" width="20" height="22"/><rect x="170" y="138" width="20" height="22"/></g>
+<g stroke="#333" fill="#fff"><rect x="190" y="138" width="20" height="22"/><rect x="210" y="138" width="20" height="22"/><rect x="230" y="138" width="20" height="22"/><rect x="250" y="138" width="20" height="22"/><rect x="270" y="138" width="20" height="22"/><rect x="290" y="138" width="20" height="22"/><rect x="310" y="138" width="20" height="22"/></g>
+<text x="350" y="154" font-family="Segoe UI">capacity 16, size 9</text>
+<text x="5" y="185" font-family="Segoe UI">Capacity path: 4 &#8594; 8 &#8594; 16 &#8594; 32 ... Orange = items, white = spare room.</text>
+</svg></div>
+<p><b>(c) Where.</b> <code>ds/DynArray.h</code>, inside <code>push_back</code> (grow step) and the destructor (<code>delete[]</code>). DynArray is used everywhere: <code>DataStore::studentOrder</code>, <code>achievementOrder</code>, <code>AVLTree::topK</code> output, <code>Student::achievements</code>, <code>splitLine</code> output.</p>
+<p><b>(d) Why this and not a plain fixed array?</b> We do not know how many students or achievements there will be (the user can add more at any time). A fixed array wastes space or overflows. A linked list would not give O(1) <code>[i]</code>.</p>
+<p><b>(e) Complexity.</b> Index O(1). push_back amortised O(1), but one single push can cost O(n) (the copy). Space O(n); up to about half is spare at worst (because of doubling).</p>
+
+<h4>Concept B: amortised O(1) and why doubling (not +1)</h4>
+<p><b>(a)</b> <b>Amortised</b> means "average cost per operation over a long sequence, even if a few operations are expensive". Analogy: you pay a big yearly fee, but spread over 12 months it is small per month.</p>
+<p><b>(b)</b> Insert 16 items starting at capacity 4. Copies happen when going 4&#8594;8 (copy 4), 8&#8594;16 (copy 8) = 12 copies plus 16 writes. Total about 28 steps for 16 items, under 2 per item. In general: copies = 4 + 8 + 16 + ... + n/2 &lt; n, so total work is under 2n, which is O(1) per push.</p>
+<p><b>Growing by +1 instead:</b> every push after full copies everything: 1 + 2 + 3 + ... + n = about n&sup2;/2 steps, which is O(n) per push, far worse.</p>
+<p><b>(c)</b> <code>DynArray::push_back</code>. <b>(d)</b> Doubling gives geometric growth; +1 or "+10" is still O(n) average. <b>(e)</b> Amortised O(1); worst single push O(n).</p>
+
+<h4>Concept C: templates</h4>
+<p><b>(a)</b> A <b>template</b> is a blueprint for code where the type is a blank: <code>template&lt;class T&gt; class DynArray</code>. The compiler stamps out a real class for each type you use (<code>DynArray&lt;int&gt;</code>, <code>DynArray&lt;std::string&gt;</code>). Analogy: a cookie cutter; one cutter, many cookies.</p>
+<p><b>(b)</b> Writing <code>DynArray&lt;int&gt; a;</code> makes the compiler copy the class and replace <code>T</code> with <code>int</code>. Because of this, template code sits in <b>header files</b> (<code>.h</code>), which is why the structures are in <code>ds/*.h</code>.</p>
+<p><b>(c)</b> <code>DynArray&lt;T&gt;</code>, <code>HashMap&lt;K,V&gt;</code>, <code>HashSet&lt;T&gt;</code>. <b>(d)</b> Without templates we would copy-paste one array class per type (int, string, RankKey, Achievement*...). <b>(e)</b> No runtime cost; it is resolved at compile time (code size grows a little per type).</p>
+
+<h4>Concept D: Rule of Three, deep vs shallow copy, RAII, ownership</h4>
+<p><b>(a)</b> If a class owns a resource (here heap memory), it needs three special functions: <b>destructor</b> (free it), <b>copy constructor</b> and <b>copy assignment</b> (copy it correctly). This is the <b>Rule of Three</b>. <b>RAII</b> (Resource Acquisition Is Initialisation) means: the object acquires the resource in its constructor and releases it in its destructor, so cleanup is automatic when the object goes out of scope. <b>Ownership</b> means "this object is responsible for freeing that memory".</p>
+<p><b>(b)</b> <b>Shallow copy</b> copies only the pointer: two objects point to the same block. <b>Deep copy</b> makes a new block and copies the items.</p>
+<div class="fig"><svg viewBox="0 0 640 150" width="640" height="150" font-size="11" font-family="Segoe UI">
+<text x="10" y="14" font-weight="bold">Shallow copy (BUG)</text>
+<rect x="10" y="22" width="90" height="26" fill="#cfe7ff" stroke="#333"/><text x="20" y="39">a.data</text>
+<rect x="10" y="62" width="90" height="26" fill="#cfe7ff" stroke="#333"/><text x="20" y="79">b.data</text>
+<rect x="190" y="38" width="110" height="26" fill="#ffd27a" stroke="#333"/><text x="205" y="55">[1][2][3] one block</text>
+<line x1="100" y1="35" x2="190" y2="48" stroke="#333"/><line x1="100" y1="75" x2="190" y2="56" stroke="#333"/>
+<text x="10" y="112" fill="#b00">a dies: delete[] block. b dies: delete[] SAME block again = double free, crash.</text>
+<text x="340" y="14" font-weight="bold">Deep copy (correct)</text>
+<rect x="340" y="22" width="90" height="26" fill="#cfe7ff" stroke="#333"/><text x="350" y="39">a.data</text>
+<rect x="340" y="62" width="90" height="26" fill="#cfe7ff" stroke="#333"/><text x="350" y="79">b.data</text>
+<rect x="500" y="22" width="110" height="26" fill="#ffd27a" stroke="#333"/><text x="515" y="39">[1][2][3]</text>
+<rect x="500" y="62" width="110" height="26" fill="#ffd27a" stroke="#333"/><text x="515" y="79">[1][2][3] (new)</text>
+<line x1="430" y1="35" x2="500" y2="35" stroke="#333"/><line x1="430" y1="75" x2="500" y2="75" stroke="#333"/>
+<text x="340" y="112" fill="#060">Each object frees only its own block. Safe.</text>
+</svg></div>
+<p><b>(c)</b> <code>DynArray</code> implements all three (deep copy). <code>HashMap</code> implements the destructor and <b>deletes</b> copying. <code>DataStore</code> destructor deletes all objects.</p>
+<p><b>(d) Why not rely on the compiler's default copy?</b> The default is a <i>shallow</i> copy, which causes the double free above. Also copy assignment must handle <code>a = a</code> (self-assignment) and free the old block before taking the new one.</p>
+<p><b>(e)</b> Deep copy is O(n) time and O(n) extra space.</p>
+
+<h4>Concept E: <code>= delete</code></h4>
+<p><b>(a)</b> <code>= delete</code> tells the compiler "this function is forbidden". Using it gives a <b>compile error</b> instead of a hidden bug. <b>(b)</b> <code>HashMap(const HashMap&amp;) = delete;</code> and <code>operator=(const HashMap&amp;) = delete;</code> so <code>HashMap b = a;</code> will not compile. <b>(c)</b> <code>ds/HashMap.h</code> (spec: copy constructor/assignment deleted). <b>(d)</b> Why delete and not write a deep copy? A deep copy of a hash map is costly (rebuild every node) and the project never needs it: we pass maps by reference (for example <code>reviewNext(const HashMap&lt;int,Achievement*&gt;&amp; registry, ...)</code>). Forbidding is safer and less code. <b>(e)</b> No runtime cost at all; the check happens at compile time.</p>
+
+<div class="box why pb-avoid"><b class="t">Mini API recap you can say aloud</b>DynArray = pointer + size + capacity. Grow by doubling. Rule of Three because it owns memory. Index is O(1); push_back is amortised O(1); removeAt is O(n).</div>
+
+<!-- HASHMAP -->
+<h3>3.2 HashMap&lt;K,V&gt; &ndash; key to value in about O(1)</h3>
+<p><b>File:</b> <code>ds/HashMap.h</code>. <b>What it is:</b> a "dictionary". You give a key (like a student id) and get the value (the Student pointer). Analogy: a library with numbered shelves; you do not scan all books, you compute the shelf from the book code.</p>
+<h4>Public API (from the spec)</h4>
+<table>
+<tr><th>Item</th><th>Meaning</th><th>Cost</th></tr>
+<tr><td><code>unsigned long hashKey(int)</code>, <code>hashKey(const std::string&amp;)</code></td><td>turn a key into a big number (string: polynomial rolling hash, base 31)</td><td>O(1) for int; O(length) for string</td></tr>
+<tr><td><code>void put(const K&amp;, const V&amp;)</code></td><td>insert or overwrite</td><td>avg O(1)</td></tr>
+<tr><td><code>V* find(const K&amp;)</code> and const version</td><td>pointer to the value, or <code>nullptr</code> if missing</td><td>avg O(1)</td></tr>
+<tr><td><code>bool contains(const K&amp;) const</code></td><td>is the key there?</td><td>avg O(1)</td></tr>
+<tr><td><code>bool remove(const K&amp;)</code></td><td>erase key; true if it existed</td><td>avg O(1)</td></tr>
+<tr><td><code>int size() const</code>, <code>int bucketCount() const</code>, <code>double loadFactor() const</code></td><td>items / buckets / items&divide;buckets</td><td>O(1)</td></tr>
+<tr><td><code>template&lt;class F&gt; void forEach(F f) const</code></td><td>call <code>f(key, value)</code> for every entry</td><td>O(buckets + n)</td></tr>
+<tr><td>Destructor; copy ctor and assignment <code>= delete</code></td><td>free all chains; forbid copying</td><td>destructor O(n + buckets)</td></tr>
+</table>
+<p>Inside: <code>Node = { K key; V value; Node* next; }</code>. The table is an array of <code>Node*</code> (the <b>buckets</b>). Start capacity: <b>16</b> buckets.</p>
+
+<h4>Concept F: hashing and the hash function</h4>
+<p><b>(a)</b> A <b>hash function</b> turns a key into a number. We then use <code>number % bucketCount</code> to pick a bucket (a slot). Same key always gives the same number. Analogy: a school roll number decides your row in the exam hall.</p>
+<p><b>(b)</b> For strings we use a <b>polynomial rolling hash</b> with base 31: start with 0, and for each character do <code>h = h*31 + character</code>. Example for "ab": 'a' = 97, 'b' = 98. After 'a': 97. After 'b': 97&times;31 + 98 = 3105. With 16 buckets: 3105 mod 16 = 1, so the key goes to bucket 1. Because each character is multiplied by a different power of 31, "ab" and "ba" give different numbers (so order matters). "ba": 98&times;31+97 = 3135.</p>
+<p><b>(c)</b> <code>hashKey()</code> overloads in <code>ds/HashMap.h</code>. Used with string keys in <code>RankEngine::dailyCount</code> (key like "studentId|date") and in <code>HashSet&lt;std::string&gt;</code> for skills. <b>(d)</b> Why this? It is cheap, simple, and spreads similar strings. A bad hash (for example "sum of characters") makes "ab" and "ba" collide always. <b>(e)</b> O(L) for a string of length L; O(1) for an int.</p>
+
+<h4>Concept G: collisions and separate chaining; what is in a bucket?</h4>
+<p><b>(a)</b> A <b>collision</b> is when two different keys land in the same bucket (unavoidable: many keys, few buckets). <b>Separate chaining</b> fixes it: each bucket holds a <b>linked list</b> (chain) of all nodes that landed there. <b>A bucket stores a pointer to the first node of its chain, or <code>nullptr</code> if empty.</b> A <b>linked node</b> is a small box with data and a pointer to the next box.</p>
+<p><b>(b)</b> Teaching example with 4 buckets, int keys, and hash = key (so bucket = key mod 4). Insert 10, 21, 7, 14, 3:</p>
+<div class="fig"><svg viewBox="0 0 640 190" width="640" height="190" font-family="Segoe UI" font-size="11">
+<g stroke="#333" fill="#cfe7ff"><rect x="20" y="15" width="60" height="30"/><rect x="20" y="45" width="60" height="30"/><rect x="20" y="75" width="60" height="30"/><rect x="20" y="105" width="60" height="30"/></g>
+<text x="28" y="35">[0] null</text><text x="28" y="65">[1]</text><text x="28" y="95">[2]</text><text x="28" y="125">[3]</text>
+<g stroke="#333" fill="#ffd27a"><rect x="110" y="48" width="60" height="24"/><rect x="110" y="78" width="60" height="24"/><rect x="200" y="78" width="60" height="24"/><rect x="110" y="108" width="60" height="24"/><rect x="200" y="108" width="60" height="24"/></g>
+<text x="120" y="64">21</text><text x="120" y="94">10</text><text x="210" y="94">14</text><text x="120" y="124">7</text><text x="210" y="124">3</text>
+<g stroke="#333" marker-end="url(#a)"><line x1="80" y1="60" x2="110" y2="60"/><line x1="80" y1="90" x2="110" y2="90"/><line x1="170" y1="90" x2="200" y2="90"/><line x1="80" y1="120" x2="110" y2="120"/><line x1="170" y1="120" x2="200" y2="120"/></g>
+<text x="300" y="50">21 mod 4 = 1  (alone)</text>
+<text x="300" y="80" fill="#b00">10 mod 4 = 2 and 14 mod 4 = 2  = COLLISION, chained</text>
+<text x="300" y="110" fill="#b00">7 mod 4 = 3 and 3 mod 4 = 3  = COLLISION, chained</text>
+<text x="300" y="140">find(14): go to bucket 2, walk: 10 (no), 14 (yes!)</text>
+<text x="20" y="170">Order inside a chain does not matter for correctness. Bucket 0 is empty (null pointer).</text>
+</svg></div>
+<p><b>(c)</b> Inside <code>put</code>, <code>find</code>, <code>remove</code> in <code>ds/HashMap.h</code>: compute bucket, then walk the chain comparing keys. <b>Important:</b> the node stores the full <b>key</b>, because different keys share a bucket, so we must compare the real key, not just the hash.</p>
+<p><b>(d) Why chaining, not "move to next empty slot" (open addressing)?</b> Chaining is easier to write and to delete from, and it never "fills up"; it just gets longer chains. <b>(e)</b> Average O(1) if chains are short. <b>Worst case O(n)</b> if all keys land in one bucket (one long chain, effectively a linked list). Space O(buckets + n).</p>
+
+<h4>Concept H: load factor and rehashing (0.75)</h4>
+<p><b>(a)</b> <b>Load factor</b> = <code>size / bucketCount</code> (average chain length). <b>Rehashing</b> = building a bigger table and re-inserting every node. Rule from the spec: <b>when size/capacity &gt; 0.75, double the bucket count and re-insert every node</b>. Start: 16 buckets.</p>
+<p><b>(b)</b> Why re-insert instead of just copying? The bucket index is <code>hash % bucketCount</code>. When bucketCount changes, a key's bucket changes too, so every node must be placed again. (Full step-by-step trace in section 4.)</p>
+<p><b>(c)</b> A private grow/rehash step called from <code>put</code> in <code>ds/HashMap.h</code> (exact private name is not in the spec). <b>(d)</b> Why 0.75? It is a common balance: lower wastes memory on empty buckets, higher makes chains longer and slower. <b>(e)</b> One rehash is O(n). It is still <b>amortised O(1) per put</b> for the same reason as DynArray: the size doubles each time, so the total rehash work over n puts is about n + n/2 + n/4 ... &lt; 2n.</p>
+
+<h4>Concept I: find() returns a pointer, <code>nullptr</code> if missing</h4>
+<p><b>(a)</b> <code>V* find(const K&amp;)</code> returns the <b>address</b> of the stored value, or <code>nullptr</code> ("points to nothing") if the key is absent. <b>(b)</b> Example: <code>Student** p = students.find(42); if (p) { Student* s = *p; }</code> (here V is <code>Student*</code>, so find gives a pointer to a pointer). <b>(c)</b> <code>HashMap::find</code>; used by <code>DataStore::findStudent</code> and <code>VerificationService::reviewNext</code>. <b>(d) Why not return a reference or a default value?</b> A reference cannot say "not found". Returning a default value (like 0) cannot tell "missing" from "real 0". A pointer gives three things in one: found / not found, and the ability to modify in place (<code>*p = newValue</code>) without a second lookup. <b>(e)</b> avg O(1). Always check for nullptr before using; dereferencing null crashes.</p>
+
+<h4>Concept J: <code>forEach</code> with a callable (template parameter <code>F</code>)</h4>
+<p><b>(a)</b> A <b>callable</b> is anything you can call like a function: a function, a <b>lambda</b> (a small unnamed function written inline), or an object with <code>operator()</code>. <code>template&lt;class F&gt; void forEach(F f) const</code> accepts any callable and calls <code>f(key, value)</code> for each entry. <b>(b)</b> Example: <code>map.forEach([&amp;](const int&amp; k, const Student* const&amp; v){ count++; });</code>. <b>(c)</b> <code>HashMap::forEach</code> and <code>HashSet::forEach</code>. <b>(d) Why not hand out the internal buckets / iterator?</b> That exposes the private table and any change to it (like a rehash) breaks the caller. forEach keeps internals hidden. A template parameter, instead of <code>std::function</code>, avoids STL and lets the compiler inline the call. <b>(e)</b> O(bucketCount + n). The order is bucket order, <b>not insertion order</b>; this is why DataStore keeps separate insertion-order arrays.</p>
+
+<!-- HASHSET -->
+<h3>3.3 HashSet&lt;T&gt; &ndash; a set with no duplicates</h3>
+<p><b>File:</b> <code>ds/HashSet.h</code>. <b>What it is:</b> a collection where each item appears at most once. The <b>Set ADT</b> (Abstract Data Type = a description of <i>what</i> operations exist, not <i>how</i> they work) offers add, contains, remove.</p>
+<table>
+<tr><th>Method</th><th>Meaning</th><th>Cost</th></tr>
+<tr><td><code>bool add(const T&amp;)</code></td><td>add; false if already present</td><td>avg O(1)</td></tr>
+<tr><td><code>bool contains(const T&amp;) const</code></td><td>is it present?</td><td>avg O(1)</td></tr>
+<tr><td><code>bool remove(const T&amp;)</code></td><td>remove; true if it was there</td><td>avg O(1)</td></tr>
+<tr><td><code>int size() const</code></td><td>number of items</td><td>O(1)</td></tr>
+<tr><td><code>template&lt;class F&gt; void forEach(F f) const</code></td><td>visit each item</td><td>O(buckets + n)</td></tr>
+</table>
+<h4>Concept K: composition (HashSet wraps <code>HashMap&lt;T,bool&gt;</code>)</h4>
+<p><b>(a)</b> <b>Composition</b> = a class <i>has a</i> member of another class and uses it, instead of rewriting it (a "has-a" relation, not an "is-a" inheritance). <b>(b)</b> The set keeps a <code>HashMap&lt;T,bool&gt;</code>. The element is the <i>key</i>; the <code>bool</code> value is a dummy (always true). So <code>add(x)</code> means "if the map already contains x return false, otherwise put(x, true) and return true". <code>contains(x)</code> is <code>map.contains(x)</code>. <b>(c)</b> <code>ds/HashSet.h</code>. Used as <code>Student::skills</code> (<code>HashSet&lt;std::string&gt;</code>). <b>(d) Why composition, not inheritance, and why not a DynArray?</b> A set "is not a" map; it just uses one. Reuse means any bug fixed in HashMap fixes the set too. A DynArray would need an O(n) scan to check duplicates on every add; the hash set does it in O(1). <b>(e)</b> Space: one dummy bool per element. Also, because the HashMap copy is deleted, HashSet cannot be copied either (the compiler will refuse).</p>
+<div class="box why"><b class="t">Cost of the choice, in numbers</b>Checking duplicates among n skills: array scan = n comparisons each time; hash set = about 1. For a student with 5 skills it hardly matters, but the design scales and shows the idea.</div>
+
+<!-- STORAGE -->
+<h3>3.4 DataStore &ndash; the owner of all data</h3>
+<p><b>File:</b> <code>Storage.h</code>. <b>What it is:</b> one class that holds every <code>Student</code> and <code>Achievement</code> and can load/save them as CSV.</p>
+<table>
+<tr><th>Member / method</th><th>Meaning</th></tr>
+<tr><td><code>HashMap&lt;int,Student*&gt; students</code></td><td>id to Student pointer</td></tr>
+<tr><td><code>HashMap&lt;int,Achievement*&gt; achievements</code></td><td>id to Achievement pointer</td></tr>
+<tr><td><code>DynArray&lt;int&gt; studentOrder, achievementOrder</code></td><td>ids in insertion order (a hash map has no stable order; this keeps the CSV output stable)</td></tr>
+<tr><td><code>int nextStudentId, nextAchievementId</code>; <code>newStudentId()</code>, <code>newAchievementId()</code></td><td>give out fresh unique ids</td></tr>
+<tr><td><code>bool addStudent(Student*)</code>, <code>bool addAchievement(Achievement*)</code></td><td>store; return false if the id already exists (spec: "false + delete-not-done", meaning the store does not delete the rejected object; the caller still owns it)</td></tr>
+<tr><td><code>Student* findStudent(int)</code>, <code>Achievement* findAchievement(int)</code></td><td>lookup, avg O(1)</td></tr>
+<tr><td><code>int studentCount() const</code>, <code>int achievementCount() const</code></td><td>counts</td></tr>
+<tr><td><code>bool loadFromCsv(studentsPath, achievementsPath)</code>, <code>bool saveToCsv(...) const</code></td><td>file I/O</td></tr>
+<tr><td><code>void clear()</code>, destructor</td><td>delete every Student and Achievement</td></tr>
+</table>
+<h4>Concept L: DataStore owns the objects (and its destructor deletes them)</h4>
+<p><b>(a)</b> The objects are created with <code>new</code> elsewhere, then handed to the store. The store is the single <b>owner</b>, so only it deletes them. Other classes (for example <code>Student::achievements</code>, <code>VerificationService</code>) hold <b>non-owning</b> pointers: they use but never delete. <b>(b)</b> Destructor: walk the hash maps (or the order arrays) and <code>delete</code> each <code>Student*</code> and <code>Achievement*</code>. Deleting an <code>Achievement*</code> works correctly because the base class has a <code>virtual ~Achievement()</code> (so the real subclass destructor runs). <b>(c)</b> <code>DataStore::~DataStore</code>, <code>clear()</code>. <b>(d) Why one owner?</b> If two places deleted the same pointer: double free. If nobody deleted: memory leak. One clear owner removes both bugs. <b>(e)</b> O(n) to clean up.</p>
+<div class="box warn"><b class="t">Do not mix up the two kinds of ownership</b>HashMap&lt;int,Student*&gt;'s destructor only frees its <i>nodes</i>, not the Student objects the pointers point to. Freeing the Students is DataStore's job.</div>
+
+<h4>Concept M: factory (use of <code>createAchievement</code>)</h4>
+<p><b>(a)</b> A <b>factory</b> is a function that builds the right subclass object from a description, so the caller does not need to know the class names. <b>(b)</b> The spec gives <code>Achievement* createAchievement(const std::string&amp; type, id, studentId, title, date, score, proof, platform)</code>; it returns <code>nullptr</code> for unknown type. The CSV loader reads the <code>type</code> column ("CODING", "CERT", "OSS", "INTERN") and calls the factory. <b>(c)</b> Defined by Manya in <code>Achievement.h</code>; <b>called</b> by <code>DataStore::loadFromCsv</code> and by <code>DataGenerator</code> (generation uses the same entry point; the spec says the factory is "used by CSV loader and CLI"; see guess list at end). <b>(d) Why?</b> Without it, the loader would need a long <code>if/else</code> that knows every subclass. <b>(e)</b> O(1). Always check for <code>nullptr</code> (a bad CSV row with an unknown type must not crash the loader).</p>
+
+<h4>Concept N: file I/O (<code>ifstream</code> / <code>ofstream</code>) and CSV parsing</h4>
+<p><b>(a)</b> <b>File I/O</b> = reading/writing files. <code>std::ifstream</code> (input file stream) reads; <code>std::ofstream</code> (output file stream) writes; <code>std::getline(file, line)</code> reads one line. <b>CSV</b> = Comma-Separated Values: one record per line, fields separated by commas. <b>(b)</b> Files:</p>
+<pre>students.csv      id,name,email,branch,gradYear,github,leetcode,skills      (skills joined with ;)
+achievements.csv  id,studentId,type,title,date,score,platform,proof,status</pre>
+<p><b>(c)</b> <code>DataStore::loadFromCsv</code> / <code>saveToCsv</code> in <code>Storage.h</code>. <b>(d) Why CSV and not a database or binary file?</b> It is human-readable (open in Notepad/Excel to check), needs no library, and it shows file handling clearly. <b>(e)</b> Time O(total characters). Both load and save return a <code>bool</code> so the caller can tell if the file could not be opened.</p>
+
+<h4>Concept O: <code>splitLine</code> and why commas are stripped from free text</h4>
+<p><b>(a)</b> <code>splitLine(const std::string&amp; line, char delim, DynArray&lt;std::string&gt;&amp; out)</code> cuts a line at each delimiter and pushes each piece into <code>out</code>. <b>(b)</b> <code>splitLine("7,Asha,asha@x.in", ',', out)</code> gives out = ["7", "Asha", "asha@x.in"]. The same function splits skills on <code>';'</code>. <b>(c)</b> Helper in <code>Storage.h</code>. <b>(d) Why strip commas?</b> Our <code>splitLine</code> is simple: it does not understand quotes. A title like "Won Round 1, 2" would split into two fields and shift every later column (the score would be read as the platform...). The spec fixes this the cheap way: <b>commas are removed from free text</b> (title, proof) when writing, and the CLI rejects commas on input. The professional alternative is quoted CSV (<code>"a,b"</code>) with a real parser; that is more code. <b>(e)</b> O(L). <b>Limitation:</b> text with commas cannot be stored exactly (they are lost).</p>
+
+<h3>3.5 DataGenerator &ndash; reproducible synthetic data</h3>
+<p><b>File:</b> <code>Storage.h</code>. <b>Call:</b> <code>DataGenerator::generate(DataStore&amp;, int studentCount = 100, unsigned seed = 2026)</code>. It makes fake names, branches, skills, and 1 to 3 achievements per student. Statuses: about 80% Approved, 12% Pending, 8% Rejected.</p>
+<h4>Concept P: linear congruential generator (LCG) and fixed seed</h4>
+<p><b>(a)</b> A <b>pseudo-random number generator</b> makes numbers that <i>look</i> random but are computed by a formula. An <b>LCG</b> is the simplest: <code>next = (a &times; current + c) mod m</code>. The first <code>current</code> is the <b>seed</b>. <b>(b)</b> Tiny example (not the project's constants): a=5, c=3, m=16, seed=7: 7 &#8594; (35+3) mod 16 = 6 &#8594; (30+3) mod 16 = 1 &#8594; (5+3) mod 16 = 8 ... Run it again with seed 7: the same sequence every time. To get "80% approved", draw a number 0..99 and treat &lt;80 as Approved, 80..91 as Pending, the rest Rejected (the cut points are an illustration; the spec only gives the percentages). <b>(c)</b> <code>DataGenerator</code> in <code>Storage.h</code>; seed default 2026. <b>(d) Why own code, not <code>rand()</code>?</b> The spec says "own code, not rand()": it shows we understand how randomness is produced, and the output does not depend on a compiler's <code>rand()</code> implementation. <b>Why a fixed seed?</b> Reproducibility: every run, on every machine, gives the same 100 students, so demos, tests and the whole team's results match, and a bug can be reproduced. <b>(e)</b> O(students &times; achievements). Not suitable for security (an LCG is predictable), fine for fake data.</p>
+
+<h3>3.6 Tests &ndash; oracle testing</h3>
+<p><b>Files:</b> <code>tests/test_structures.cpp</code> (yours), <code>TestUtil.h</code> (shared with Pranjal's pipeline tests).</p>
+<h4>Concept Q: oracle testing</h4>
+<p><b>(a)</b> An <b>oracle</b> is a trusted source of the right answer. Here, the STL containers are the oracle: we do the same operations on <i>our</i> structure and on the STL one, then check the results match. Analogy: checking your maths answer with a calculator. <b>(b)</b> Example idea: push 10,000 numbers into <code>DynArray&lt;int&gt;</code> and a <code>std::vector&lt;int&gt;</code>; compare size and every element. Put/remove many random keys in <code>HashMap&lt;int,int&gt;</code> and in <code>std::unordered_map</code>, then compare <code>size()</code> and every <code>find</code>. <b>(c)</b> Only inside <code>tests/</code>; the program itself has no STL containers. <b>(d) Why oracle testing, not hand-picked cases?</b> Hand-picked cases miss odd situations (many collisions, rehash boundaries). Random comparison against a trusted structure covers more with less effort. <b>(e)</b> A test is only as good as its checks: it proves agreement on the inputs tried, not for all inputs.</p>
+<p class="small">What exactly each test file asserts is not detailed in the spec; describe it in your own words from your code.</p>
+
+<!-- 5 TRACES -->
+<h2 class="pb">4. Two worked traces</h2>
+<h3>Trace 1: loading one CSV line into DataStore</h3>
+<p>Take this achievements line (example values): <code>12,7,CODING,Won Weekly Contest,05-03-2026,80,codeforces,link_to_proof,Approved</code></p>
+<ol>
+<li><code>loadFromCsv</code> opens the file with <code>std::ifstream</code>. If it cannot open it, it returns <code>false</code>.</li>
+<li>It reads the header line and skips it, then loops with <code>getline</code> until the end of the file.</li>
+<li>For this line, <code>splitLine(line, ',', parts)</code> fills a <code>DynArray&lt;std::string&gt;</code> with 9 pieces: id, studentId, type, title, date, score, platform, proof, status.</li>
+<li>Numbers come as text, so id, studentId, score are converted to <code>int</code> (for example with <code>std::atoi</code>; <code>&lt;cstdlib&gt;</code> is on the allowed list; the exact conversion call is not in the spec).</li>
+<li>The loader calls the factory <code>createAchievement("CODING", 12, 7, "Won Weekly Contest", "05-03-2026", 80, "link_to_proof", "codeforces")</code>, which returns a <code>CodingAchievement*</code> (or <code>nullptr</code> if the type is unknown, in which case the row is skipped or reported).</li>
+<li>The status column ("Approved") is applied to the new object. The spec states a new object starts as Pending and only <code>approve()</code> / <code>reject()</code> change it, so the loader must go through those methods.</li>
+<li><code>addAchievement(a)</code> runs: it checks the id with the HashMap (<code>find</code>). If the id is new: <code>put(12, a)</code> into <code>achievements</code> and <code>achievementOrder.push_back(12)</code>, return true. If the id already exists, return false, and the store does not delete the object.</li>
+<li>For the students file, the same steps happen with 8 columns, and the <code>skills</code> column is split again on <code>';'</code> with <code>splitLine(skills, ';', skillParts)</code>, each piece being added to the student's <code>HashSet&lt;std::string&gt;</code> via <code>addSkill</code>.</li>
+<li>At the end the <code>nextStudentId</code> / <code>nextAchievementId</code> counters should be above the largest id seen, so new ids never clash (exact rule not detailed in the spec).</li>
+</ol>
+<h3>Trace 2: a <code>put</code> that triggers a rehash</h3>
+<p>Setup: a <code>HashMap&lt;int,int&gt;</code> with 16 buckets. Assume the int hash is the key itself (the spec does not say), so bucket = key mod 16. It currently holds 12 keys, so load factor = 12/16 = 0.75, which is <b>not</b> above 0.75. Keys 3 and 19 are both in bucket 3 (3 mod 16 = 3, 19 mod 16 = 3, a collision chain).</p>
+<ol>
+<li><code>put(35, 100)</code> is called. 35 mod 16 = 3, so we walk bucket 3's chain: 3 (no), 19 (no), end. Key is new.</li>
+<li>Make a new node <code>{35, 100, next}</code> and link it into bucket 3's chain. size becomes 13.</li>
+<li>Check load factor: 13/16 = 0.8125 &gt; 0.75, so <b>rehash</b>. (Whether the check runs just before or just after insertion is not stated in the spec; the result for the user is the same, a bigger table.)</li>
+<li>Allocate a new bucket array of <b>32</b> pointers, all <code>nullptr</code>.</li>
+<li>Walk each old bucket and each node in its chain. For each node compute the <b>new</b> bucket: key mod 32. Re-link the same node into the new table (no need to create a new node).
+<ul><li>key 3: 3 mod 32 = 3 &#8594; new bucket 3</li><li>key 19: 19 mod 32 = 19 &#8594; new bucket 19 (the chain is split!)</li><li>key 35: 35 mod 32 = 3 &#8594; new bucket 3 (shares with key 3)</li></ul></li>
+<li><code>delete[]</code> the old bucket array (only the array of pointers; the nodes live on in the new table).</li>
+<li>Update bucket count to 32. Now load factor = 13/32 = 0.41, chains are shorter again.</li>
+</ol>
+<div class="fig"><svg viewBox="0 0 640 120" width="640" height="120" font-family="Segoe UI" font-size="11">
+<text x="10" y="14" font-weight="bold">Before (16 buckets): bucket 3</text>
+<g stroke="#333" fill="#ffd27a"><rect x="10" y="24" width="40" height="22"/><rect x="70" y="24" width="40" height="22"/><rect x="130" y="24" width="40" height="22"/></g>
+<text x="22" y="39">3</text><text x="80" y="39">19</text><text x="140" y="39">35</text>
+<g stroke="#333" marker-end="url(#a)"><line x1="50" y1="35" x2="70" y2="35"/><line x1="110" y1="35" x2="130" y2="35"/></g>
+<text x="250" y="14" font-weight="bold">After (32 buckets)</text>
+<g stroke="#333" fill="#ffd27a"><rect x="250" y="24" width="40" height="22"/><rect x="310" y="24" width="40" height="22"/><rect x="250" y="70" width="40" height="22"/></g>
+<text x="262" y="39">3</text><text x="320" y="39">35</text><text x="258" y="85">19</text>
+<line x1="290" y1="35" x2="310" y2="35" stroke="#333" marker-end="url(#a)"/>
+<text x="380" y="39">bucket 3: 3 &#8594; 35</text><text x="380" y="85">bucket 19: 19</text>
+</svg></div>
+<div class="box why"><b class="t">Why is one rehash still amortised O(1)?</b>It costs O(n), but it happens only when size reaches 0.75 &times; capacity, then capacity doubles, so the next rehash is about as far away as the current size again. Total rehash work for n inserts is about n + n/2 + n/4 + ... &lt; 2n, so per insert it averages a constant.</div>
+
+<!-- 6 EDGE CASES -->
+<h2>5. Edge cases and honest limitations</h2>
+<table>
+<tr><th>Situation</th><th>What happens / why it matters</th></tr>
+<tr><td>All keys land in one bucket</td><td>The chain is the whole list: <b>worst case O(n)</b> for put/find/remove. Average stays O(1) only if the hash spreads keys well.</td></tr>
+<tr><td><code>find</code> on a missing key</td><td>Returns <code>nullptr</code>. Caller must check, or the program crashes.</td></tr>
+<tr><td>Pointers returned by <code>find</code> after a rehash</td><td>A rehash re-links nodes (the spec says every node is re-inserted). Do not keep an old pointer across a <code>put</code>; look it up again. Also, in DynArray, a pointer or reference from <code>operator[]</code> is invalid after <code>push_back</code> grows the array (the block moved).</td></tr>
+<tr><td>Copying a HashMap / HashSet / DataStore</td><td>Not allowed (<code>= delete</code>), a compile error. Pass by reference.</td></tr>
+<tr><td>Copying a DynArray</td><td>Allowed and deep, O(n). Copying a <code>DynArray&lt;Achievement*&gt;</code> copies the <i>pointers</i>, not the objects (non-owning).</td></tr>
+<tr><td><code>operator[]</code> with a bad index</td><td>Spec gives no bounds-check promise. Treat out-of-range as your mistake (undefined behaviour unless the code checks).</td></tr>
+<tr><td><code>removeAt</code> bad index</td><td>Returns <code>bool</code>; false means "index not valid, nothing removed" (this is what a bool return suggests; confirm with your code).</td></tr>
+<tr><td>Duplicate id in <code>addStudent</code> / <code>addAchievement</code></td><td>Returns false and does <b>not</b> delete the object. The caller still owns it and must delete it, or it leaks.</td></tr>
+<tr><td>Commas in titles/names</td><td>Stripped, so CSV cannot hold commas in free text. Original text is not preserved exactly.</td></tr>
+<tr><td>Bad or missing CSV file</td><td><code>loadFromCsv</code> returns false; app generates synthetic data if files are missing.</td></tr>
+<tr><td>Unknown achievement type in CSV</td><td>Factory returns <code>nullptr</code>; must not be stored.</td></tr>
+<tr><td>Hash map order</td><td>No guaranteed order, so <code>studentOrder</code>/<code>achievementOrder</code> exist for stable CSV output.</td></tr>
+<tr><td>Thread safety, huge files, binary data</td><td>Not handled. Single-threaded, small data (100 students).</td></tr>
+<tr><td>LCG quality</td><td>Fine for fake data, weak statistically and not secure.</td></tr>
+</table>
+<p><b>Honest limitation statement for the viva:</b> "Our hash map has no iterator, only <code>forEach</code>; copying is forbidden; the CSV format cannot hold commas; the string hash is simple, so worst-case behaviour is O(n); and the data is synthetic, not real."</p>
+
+<!-- 7 CHECKLIST -->
+<h2 class="pb">6. What to learn before tomorrow (about 2.5 hours)</h2>
+<ol>
+<li><b>20 min &ndash; Memory basics.</b> Stack vs heap, <code>new</code> / <code>delete[]</code>, shallow vs deep copy, what a dangling pointer and a double free are.</li>
+<li><b>25 min &ndash; DynArray.</b> Re-read your file. Say the 4&#8594;8&#8594;16 growth out loud. Be able to explain amortised O(1) with the "total under 2n" sum. Know why <code>removeAt</code> is O(n).</li>
+<li><b>15 min &ndash; Rule of Three and <code>= delete</code>.</b> Write the three functions for a tiny class from memory. Know why HashMap deletes copies.</li>
+<li><b>35 min &ndash; HashMap.</b> Hash for strings (do "ab" by hand), bucket = hash mod buckets, chains, put/find/remove walk, load factor 0.75, rehash. Do trace 2 (section 4) on paper twice.</li>
+<li><b>10 min &ndash; HashSet.</b> The composition idea: set = map with dummy bool.</li>
+<li><b>20 min &ndash; DataStore + CSV.</b> The two headers, <code>splitLine</code>, why commas are stripped, ownership and destructor, why order arrays exist. Do trace 1 once.</li>
+<li><b>10 min &ndash; DataGenerator.</b> LCG formula, seed 2026, why reproducible.</li>
+<li><b>10 min &ndash; Tests.</b> What you compare against (STL oracle) and in which file.</li>
+<li><b>15 min &ndash; Big picture.</b> The flow in section 2 and which teammate does what, and where your parts are touched (every lookup by id).</li>
+<li><b>30 min &ndash; Viva.</b> Cover the answers in section 7 and answer aloud. Re-read any you stumbled on.</li>
+</ol>
+<p><b>Also do:</b> compile and run once (<code>g++ -std=c++17 -Wall -Wextra main.cpp -o forge.exe</code>, then <code>forge.exe --demo</code>) so you can answer "does it work?" from first-hand experience, and open your own header files and make sure you can point at each function you are asked about.</p>
+<h3>What you must be able to draw on a whiteboard</h3>
+<ul>
+<li>DynArray growth 4 &#8594; 8 &#8594; 16 with the copy arrows.</li>
+<li>A hash table with 4 to 8 buckets, 5 keys, and at least one collision chain (nodes with <code>key, value, next</code>).</li>
+<li>The same table before and after rehash (bucket count doubles, chains split).</li>
+<li>The system flow diagram from section 2, with your boxes marked.</li>
+<li>Shallow vs deep copy (two pointers to one block vs two blocks).</li>
+<li>HashSet wrapping HashMap&lt;T,bool&gt; (a small box inside a box).</li>
+<li>One CSV line cut into fields by <code>splitLine</code>.</li>
+</ul>
+
+<!-- 8 VIVA -->
+<h2 class="pb">7. Viva questions and model answers</h2>
+<p class="small">Say the answer in your own words. Keep it short; then give the example if asked.</p>
+
+<div class="q"><div class="qq">1. What is your role in the project?</div>I built the foundation layer: DynArray, HashMap, HashSet, DataStore (owner of all objects plus CSV load/save), DataGenerator (100 reproducible students), and the structure tests.</div>
+<div class="q"><div class="qq">2. Why did the project avoid STL containers?</div>It is a DSA project. We must show that we can build the structures ourselves. STL is used only in tests as an independent checker.</div>
+<div class="q"><div class="qq">3. Why not just use arrays?</div>A plain array has a fixed size and a linear search for finding a student by id (O(n)). DynArray grows on demand, and for lookup by id we use a hash map (about O(1)). An array is still right when we need ordered, index-based access, and DynArray gives that.</div>
+<div class="q"><div class="qq">4. How does DynArray grow?</div>When size equals capacity, it allocates a block of double the capacity (starting at 4), copies the items, frees the old block, then adds the new item.</div>
+<div class="q"><div class="qq">5. Why double, not +1?</div>Growing by +1 copies everything on every push: 1+2+...+n is about n&sup2;/2, so O(n) per push. Doubling makes copies add up to under 2n total, so O(1) average.</div>
+<div class="q"><div class="qq">6. What does "amortised O(1)" mean? Is any single push slow?</div>Average cost per operation over a long sequence. Yes: the push that triggers growth costs O(n). Those are rare, so the average is constant.</div>
+<div class="q"><div class="qq">7. What is the Rule of Three?</div>If a class owns a resource, write the destructor, copy constructor and copy assignment together. For DynArray they free memory and deep-copy.</div>
+<div class="q"><div class="qq">8. Deep copy vs shallow copy?</div>Shallow copies the pointer, so two objects share one block, and both free it later (double free). Deep makes a new block and copies the values.</div>
+<div class="q"><div class="qq">9. Why is copy deleted for HashMap?</div>Copying would have to rebuild every node and is never needed; passing by reference is enough. Deleting it turns accidental copies into compile errors, and avoids the shallow-copy double free.</div>
+<div class="q"><div class="qq">10. What does <code>= delete</code> do?</div>It forbids a function. If code tries to use it, compilation fails.</div>
+<div class="q"><div class="qq">11. What is RAII?</div>A resource is acquired in the constructor and released in the destructor, so cleanup is automatic when the object goes out of scope. Our containers free their memory in their destructors.</div>
+<div class="q"><div class="qq">12. Why templates?</div>One blueprint works for many types (<code>DynArray&lt;int&gt;</code>, <code>HashMap&lt;int,Student*&gt;</code>) without copy-pasting code, and there is no runtime cost.</div>
+<div class="q"><div class="qq">13. How does a hash map work?</div>A hash function turns a key into a number; number mod bucket count gives the bucket; the bucket holds a chain of nodes; we walk the chain comparing keys. Average O(1).</div>
+<div class="q"><div class="qq">14. What is stored in a bucket?</div>A pointer to the first node of a linked chain (or <code>nullptr</code> if empty). Each node holds key, value and a next pointer.</div>
+<div class="q"><div class="qq">15. What if two keys collide?</div>Both nodes go into the same bucket's chain (separate chaining). To find one, we walk the chain and compare real keys. That is why the node stores the key.</div>
+<div class="q"><div class="qq">16. Describe your string hash.</div>Polynomial rolling hash with base 31: <code>h = h*31 + char</code> for each character. Each position gets a different weight, so "ab" differs from "ba".</div>
+<div class="q"><div class="qq">17. What is the load factor and when do you rehash?</div>Load factor is size divided by bucket count. When it goes above 0.75, we double the buckets and re-insert every node.</div>
+<div class="q"><div class="qq">18. Why must you re-insert nodes after growing, rather than copy the buckets?</div>The bucket index is hash mod bucketCount. When bucketCount changes, the index changes, so each node must be re-placed.</div>
+<div class="q"><div class="qq">19. Why is rehash still amortised O(1)?</div>A rehash is O(n) but happens only after the size grows by about double; the total over n inserts is about n + n/2 + n/4 + ... &lt; 2n.</div>
+<div class="q"><div class="qq">20. What is the worst case for HashMap?</div>O(n) for put/find/remove, if all keys land in one bucket (one long chain). It is rare with a good hash and rehashing.</div>
+<div class="q"><div class="qq">21. Why chaining instead of open addressing?</div>It is simpler to write and delete from, and a full table is never an issue (chains just grow). Open addressing is more cache-friendly but needs tombstones for deletion.</div>
+<div class="q"><div class="qq">22. Why hash map and not a BST / sorted array for student lookup?</div>We only need exact-key lookup, which a hash map does in about O(1). A BST gives O(log N) and its advantage (ordering) is not needed here. (Ordering IS needed for the leaderboard, so Pranjal uses an AVL tree there.)</div>
+<div class="q"><div class="qq">23. Why does <code>find</code> return a pointer?</div>It can express "not found" with <code>nullptr</code> and also allows in-place modification with one lookup. A reference cannot be null; a default value is ambiguous.</div>
+<div class="q"><div class="qq">24. What if <code>find</code> returns <code>nullptr</code> and you dereference it?</div>Undefined behaviour, usually a crash. Always check first.</div>
+<div class="q"><div class="qq">25. What is <code>forEach</code> and why is F a template parameter?</div>It calls any callable (lambda, function, functor) for every entry. A template parameter accepts all of them without STL's <code>std::function</code>, and without exposing the table's internals.</div>
+<div class="q"><div class="qq">26. How is HashSet built?</div>By composition: it holds a <code>HashMap&lt;T,bool&gt;</code>; the item is the key, the bool is a dummy. <code>add</code> returns false if the key already exists. All operations are average O(1).</div>
+<div class="q"><div class="qq">27. Who owns the Student and Achievement objects? Who deletes them?</div>DataStore owns them; its destructor (and <code>clear()</code>) deletes them. Other classes only keep non-owning pointers. The base destructor is virtual so subclasses are destroyed correctly.</div>
+<div class="q"><div class="qq">28. Why keep <code>studentOrder</code> and <code>achievementOrder</code> arrays when you already have hash maps?</div>A hash map has no stable order. The arrays record insertion order, so the saved CSV always has the same order.</div>
+<div class="q"><div class="qq">29. How is the CSV parsed, and why are commas removed from text?</div>Each line is cut with <code>splitLine</code> at commas. Our splitter does not understand quotes, so a comma inside a title would shift columns. We strip commas from free text (and the CLI rejects them). Trade-off: simple code, but commas are lost.</div>
+<div class="q"><div class="qq">30. Why a fixed seed and your own LCG for generated data?</div>A fixed seed (2026) gives identical data on every run, so demos, tests and debugging are reproducible. The LCG is our own code, not <code>rand()</code>, to show how pseudo-randomness works and avoid compiler differences. It is not secure.</div>
+<div class="q"><div class="qq">31. How do you know your structures are correct?</div>Oracle testing: run the same operations on our structure and on an STL one (inside tests only) and compare results. It increases confidence but cannot prove correctness for all inputs.</div>
+<div class="q"><div class="qq">32. What if <code>addStudent</code> is given an id that already exists?</div>It returns false and does not store it. The store does not delete the object, so the caller must, or it leaks.</div>
+<div class="q"><div class="qq">33. Tricky: after a rehash, is a pointer you got from <code>find</code> still valid?</div>Do not rely on it. The nodes are re-linked in a new table, so refetch with <code>find</code> after any <code>put</code>. (Same for DynArray pointers after growth.)</div>
+<div class="q"><div class="qq">34. Tricky: which part of the system depends on your code most?</div>Almost everything: DataStore's maps resolve every id lookup, reviewNext uses the registry HashMap, RankEngine's three HashMaps hold scores and daily counts, and Student's skills use HashSet.</div>
+
+<h3>Guesses made in this guide (spec was silent)</h3>
+<ul class="small">
+<li>int hash is shown as the key itself (identity), and the bucket as hash mod bucketCount. The spec only gives the string hash and "base 31".</li>
+<li>String hash starts at 0 and does <code>h = h*31 + char</code>.</li>
+<li>Whether the 0.75 check happens just before or after inserting, and the private rehash function's name.</li>
+<li>Order of nodes inside a chain; how the loader converts numbers; how it applies the status column; how counters are set after load.</li>
+<li>What each test asserts; bounds checking of <code>operator[]</code>; <code>removeAt</code> returning false for a bad index.</li>
+<li>Whether <code>DataGenerator</code> calls the factory directly (the spec lists only the CSV loader and CLI as factory users).</li>
+</ul>
+</body></html>

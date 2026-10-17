@@ -1,125 +1,216 @@
-#pragma once // HEADER GUARD: Prevents multiple inclusions of this file across the project
+#pragma once // HEADER GUARD
 
 #include <iostream>
 #include <string>
+#include <cctype>
 
 // ============================================================================
-// ENUM: AchievementCategory
+// ENUMS  (enum class = strongly typed: you must write AchievementCategory::OPEN_SOURCE)
 // ============================================================================
-// Strongly typed enum used by RankEngine to apply domain-specific multipliers
 enum class AchievementCategory {
-    INTERNSHIP,               // 5.0x multiplier (Industry experience)
-    COMPETITIVE_PROGRAMMING,  // 3.5x multiplier (Problem solving & DSA)
-    OPEN_SOURCE,              // 2.5x multiplier (Real-world software dev)
-    CERTIFICATION,            // 1.0x multiplier (Coursework & exams)
-    GENERAL                   // 1.0x default
+    INTERNSHIP,               // industry experience
+    COMPETITIVE_PROGRAMMING,  // contests, problem solving
+    OPEN_SOURCE,              // GitHub contributions
+    CERTIFICATION,            // courses and exams
+    GENERAL
 };
 
+// The life of a submission:   Pending --approve()--> Approved
+//                             Pending --reject() --> Rejected
+// Approved and Rejected are FINAL (no way back). This is a tiny "state machine".
+enum class VerificationStatus { Pending, Approved, Rejected };
+
 // ============================================================================
-// BASE CLASS: Achievement (OOP: Encapsulation & Abstraction)
+// ABSTRACT BASE CLASS: Achievement
 // ============================================================================
-// Blueprint defining common attributes and behaviors for all achievements.
+// ABSTRACT = has at least one pure virtual function (= 0), so you can never
+// create a plain Achievement. You can only create CodingAchievement,
+// CertificateAchievement, etc. Code that handles any kind of achievement uses
+// an 'Achievement*' and the right overridden function runs at run time
+// (RUNTIME POLYMORPHISM).
 class Achievement {
 protected:
-    // 'protected': Accessible by derived classes, hidden from outside code (Encapsulation)
-    int id;                        // Unique identifier for the achievement
-    std::string title;             // Name/title of the achievement
-    std::string date;              // Date earned or submitted
-    int score;                     // Raw base score / rating points
-    std::string proof;             // URL, file link, or certificate artifact
-    bool verified;                 // Verification status (true = approved, false = pending)
-    AchievementCategory category;  // Category tag for dynamic weight calculations
+    // ENCAPSULATION: data is hidden. Outside code cannot set 'status' directly;
+    // it must call approve() / reject(), which enforce the rules.
+    int id;
+    int studentId;                 // owner of this achievement
+    std::string title;
+    std::string date;              // "DD-MM-YYYY"
+    int score;                     // raw base points claimed
+    std::string proof;             // link or file name
+    VerificationStatus status;     // starts as Pending
+    bool pointsApplied;            // true once RankEngine has added the points
+    AchievementCategory category;
+
+    // Shared printing code for all derived display() functions.
+    void printCommon() const {
+        std::cout << "  ID: " << id << " | Student: " << studentId << "\n"
+                  << "  Title: " << title << "\n"
+                  << "  Date: " << date << " | Raw score: " << score << "\n"
+                  << "  Proof: " << proof << "\n"
+                  << "  Status: " << statusName(status) << "\n";
+    }
 
 public:
-    // CONSTRUCTOR: Uses member initializer list for efficient attribute initialization
-    Achievement(int id, std::string title, std::string date, int score, std::string proof,
-                AchievementCategory category = AchievementCategory::GENERAL)
-        : id(id), title(title), date(date), score(score), proof(proof),
-          verified(false), category(category) {}
+    // Constructor with a MEMBER INITIALIZER LIST (builds members directly, no extra copy).
+    Achievement(int id, int studentId, const std::string& title, const std::string& date,
+                int score, const std::string& proof, AchievementCategory category)
+        : id(id), studentId(studentId), title(title), date(date), score(score),
+          proof(proof), status(VerificationStatus::Pending), pointsApplied(false),
+          category(category) {}
 
-    // VIRTUAL DESTRUCTOR: Ensures derived class destructors are called when deleted via Achievement*
+    // VIRTUAL DESTRUCTOR: DataStore deletes objects through Achievement* pointers.
+    // Without 'virtual' only the base part would be destroyed (undefined behaviour).
     virtual ~Achievement() {}
 
-    // OOP: POLYMORPHISM (Virtual Function)
-    // 'virtual' allows derived classes to override this method at runtime (dynamic binding)
-    virtual void display() const {
-        std::cout << "ID:        " << id << std::endl;
-        std::cout << "Title:     " << title << std::endl;
-        std::cout << "Date:      " << date << std::endl;
-        std::cout << "Raw Score: " << score << std::endl;
-        std::cout << "Proof:     " << proof << std::endl;
-        std::cout << "Status:    " << (verified ? "Verified" : "Pending") << std::endl;
+    // ---- pure virtual: every concrete achievement MUST provide these ------
+    virtual void display() const = 0;
+    virtual double categoryWeight() const = 0;     // importance of this category
+    virtual std::string typeName() const = 0;      // text used in CSV files
+
+    // ---- virtual with a sensible default (derived classes MAY override) ---
+    virtual double platformMultiplier() const { return 1.0; }
+    virtual double basePoints() const { return static_cast<double>(score); }
+
+    // TEMPLATE-METHOD style: fixed recipe, customised by the virtual parts above.
+    // A negative score (e.g. contest rating loss) is cushioned to 30%.
+    double weightedPoints() const {
+        double base = basePoints();
+        if (base < 0.0) return base * 0.3;
+        return base * categoryWeight() * platformMultiplier();
     }
 
-    // MUTATOR: Marks the achievement as verified/approved
-    void verify() { verified = true; }
+    // ---- state machine: only a Pending submission may change --------------
+    bool approve() {
+        if (status != VerificationStatus::Pending) return false;
+        status = VerificationStatus::Approved;
+        return true;
+    }
+    bool reject() {
+        if (status != VerificationStatus::Pending) return false;
+        status = VerificationStatus::Rejected;
+        return true;
+    }
 
-    // GETTERS: Marked 'const' because they only read data without modifying object state
+    // SCORE-ONCE GUARD (check AND set in ONE call, so it cannot be forgotten):
+    // returns true only the first time an Approved achievement asks to be scored.
+    bool tryConsumeForScoring() {
+        if (status != VerificationStatus::Approved || pointsApplied) return false;
+        pointsApplied = true;
+        return true;
+    }
+
+    // ---- getters (const = they never change the object) -------------------
     int getId() const { return id; }
+    int getStudentId() const { return studentId; }
+    const std::string& getTitle() const { return title; }
+    const std::string& getDate() const { return date; }
     int getScore() const { return score; }
-    bool isVerified() const { return verified; }
-    std::string getTitle() const { return title; }
+    const std::string& getProof() const { return proof; }
+    VerificationStatus getStatus() const { return status; }
+    bool isApproved() const { return status == VerificationStatus::Approved; }
+    bool isPointsApplied() const { return pointsApplied; }
     AchievementCategory getCategory() const { return category; }
-};
 
-// ============================================================================
-// DERIVED CLASS: CodingAchievement (OOP: Inheritance)
-// ============================================================================
-// Represents Competitive Programming & DSA milestones
-class CodingAchievement : public Achievement {
-public:
-    // Constructor delegates member initialization to parent Achievement constructor
-    CodingAchievement(int id, std::string title, std::string date, int score, std::string proof)
-        : Achievement(id, title, date, score, proof, AchievementCategory::COMPETITIVE_PROGRAMMING) {}
-
-    // OVERRIDE: Customizes display specifically for Coding achievements
-    void display() const override {
-        std::cout << "[Category: Competitive Programming / Coding]" << std::endl;
-        Achievement::display(); // Reuses base class printing logic
+    static const char* statusName(VerificationStatus s) {
+        switch (s) {
+            case VerificationStatus::Pending:  return "Pending";
+            case VerificationStatus::Approved: return "Approved";
+            case VerificationStatus::Rejected: return "Rejected";
+        }
+        return "Unknown";
     }
 };
 
 // ============================================================================
-// DERIVED CLASS: CertificateAchievement (OOP: Inheritance)
+// DERIVED CLASSES  (INHERITANCE: "a CodingAchievement IS-A Achievement")
 // ============================================================================
-// Represents formal credentials & course certificates
+
+// Competitive programming. Also knows its contest PLATFORM, which changes the points.
+class CodingAchievement : public Achievement {
+private:
+    std::string platform;
+
+    static std::string lower(std::string s) {
+        for (size_t i = 0; i < s.size(); ++i)
+            s[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(s[i])));
+        return s;
+    }
+
+public:
+    CodingAchievement(int id, int studentId, const std::string& title, const std::string& date,
+                      int score, const std::string& proof, const std::string& platform)
+        : Achievement(id, studentId, title, date, score, proof,
+                      AchievementCategory::COMPETITIVE_PROGRAMMING),
+          platform(platform) {}
+
+    const std::string& getPlatform() const { return platform; }
+
+    double categoryWeight() const override { return 3.5; }
+    std::string typeName() const override { return "CODING"; }
+
+    // OVERRIDE of the default: harder platforms are worth more.
+    double platformMultiplier() const override {
+        std::string p = lower(platform);
+        if (p == "codeforces") return 2.5;
+        if (p == "codechef")   return 1.8;
+        if (p == "leetcode")   return 1.2;
+        if (p == "hackerrank") return 0.8;
+        return 1.0;
+    }
+
+    void display() const override {
+        std::cout << "[Competitive Programming | " << platform << "]\n";
+        printCommon();
+    }
+};
+
 class CertificateAchievement : public Achievement {
 public:
-    CertificateAchievement(int id, std::string title, std::string date, int score, std::string proof)
-        : Achievement(id, title, date, score, proof, AchievementCategory::CERTIFICATION) {}
+    CertificateAchievement(int id, int studentId, const std::string& title, const std::string& date,
+                           int score, const std::string& proof)
+        : Achievement(id, studentId, title, date, score, proof, AchievementCategory::CERTIFICATION) {}
 
-    void display() const override {
-        std::cout << "[Category: Certification]" << std::endl;
-        Achievement::display();
-    }
+    double categoryWeight() const override { return 1.0; }
+    std::string typeName() const override { return "CERT"; }
+    void display() const override { std::cout << "[Certification]\n"; printCommon(); }
 };
 
-// ============================================================================
-// DERIVED CLASS: OpenSourceAchievement (OOP: Inheritance)
-// ============================================================================
-// Represents GitHub PRs, commits, and open-source contributions
 class OpenSourceAchievement : public Achievement {
 public:
-    OpenSourceAchievement(int id, std::string title, std::string date, int score, std::string proof)
-        : Achievement(id, title, date, score, proof, AchievementCategory::OPEN_SOURCE) {}
+    OpenSourceAchievement(int id, int studentId, const std::string& title, const std::string& date,
+                          int score, const std::string& proof)
+        : Achievement(id, studentId, title, date, score, proof, AchievementCategory::OPEN_SOURCE) {}
 
-    void display() const override {
-        std::cout << "[Category: Open Source / Dev]" << std::endl;
-        Achievement::display();
-    }
+    double categoryWeight() const override { return 2.5; }
+    std::string typeName() const override { return "OSS"; }
+    void display() const override { std::cout << "[Open Source]\n"; printCommon(); }
 };
 
-// ============================================================================
-// DERIVED CLASS: InternshipAchievement (OOP: Inheritance)
-// ============================================================================
-// Represents industry internships and real-world work experience
 class InternshipAchievement : public Achievement {
 public:
-    InternshipAchievement(int id, std::string title, std::string date, int score, std::string proof)
-        : Achievement(id, title, date, score, proof, AchievementCategory::INTERNSHIP) {}
+    InternshipAchievement(int id, int studentId, const std::string& title, const std::string& date,
+                          int score, const std::string& proof)
+        : Achievement(id, studentId, title, date, score, proof, AchievementCategory::INTERNSHIP) {}
 
-    void display() const override {
-        std::cout << "[Category: Internship / Industry]" << std::endl;
-        Achievement::display();
-    }
+    double categoryWeight() const override { return 5.0; }
+    std::string typeName() const override { return "INTERN"; }
+    void display() const override { std::cout << "[Internship]\n"; printCommon(); }
 };
+
+// ============================================================================
+// FACTORY FUNCTION
+// ============================================================================
+// Builds the right derived object from a text type ("CODING", "CERT", "OSS",
+// "INTERN"). The CSV loader and the CLI both need this, so it lives in ONE place.
+// Returns a NEW object (caller/DataStore owns it) or nullptr for unknown types.
+inline Achievement* createAchievement(const std::string& type, int id, int studentId,
+                                      const std::string& title, const std::string& date,
+                                      int score, const std::string& proof,
+                                      const std::string& platform) {
+    if (type == "CODING") return new CodingAchievement(id, studentId, title, date, score, proof, platform);
+    if (type == "CERT")   return new CertificateAchievement(id, studentId, title, date, score, proof);
+    if (type == "OSS")    return new OpenSourceAchievement(id, studentId, title, date, score, proof);
+    if (type == "INTERN") return new InternshipAchievement(id, studentId, title, date, score, proof);
+    return nullptr;
+}

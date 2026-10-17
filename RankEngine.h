@@ -1,301 +1,122 @@
-#pragma once // HEADER GUARD: Ensures single inclusion across compilation units
+#pragma once
 
-#include <iostream>
 #include <string>
-#include <vector>
-#include <unordered_map>
-#include <set>
 #include <cmath>
-#include <iomanip>
-#include <algorithm>
-#include <utility>
 #include "User.h"
 #include "Achievement.h"
+#include "ds/HashMap.h"
+#include "ds/AVLTree.h"
+#include "ds/DynArray.h"
 
 // ============================================================================
-// RANK ENGINE CORE (DSA: Hybrid Hash Map + Self-Balancing BST Architecture)
+// RankEngine  -  scoring maths + live leaderboard
 // ============================================================================
-// Single Responsibility: Handles score normalization, anti-spam decay, 
-// dynamic weighting, and leaderboard rankings for the GEU Forge platform.
+// SINGLE RESPONSIBILITY: it turns APPROVED achievements into EXP and keeps the
+// students sorted. It does not verify anything (VerificationService does) and
+// does not print menus (App does).
+//
+// HYBRID DESIGN: two structures, each doing what it is best at.
+//   HashMap  (expMap)  : studentId -> current EXP.     O(1) to find the OLD key.
+//   AVLTree  (board)   : sorted (EXP, studentId) keys. O(log N) erase + insert,
+//                        O(log N) rank, O(K) top-K.
+// Without the map we would not know which key to erase from the tree.
+// Without the tree we would have to sort all students again after every change.
+//
+// COMPOSITION: RankEngine HAS-A HashMap(s) and an AVLTree.
 class RankEngine {
 private:
-    // ------------------------------------------------------------------------
-    // 1. DATA STRUCTURE: std::unordered_map<int, double> studentExpMap
-    // ------------------------------------------------------------------------
-    // WHY USED:
-    // - Hash Table implementation mapping studentId -> current Normalized EXP.
-    // - Time Complexity:  O(1) Average lookup, insert, and update.
-    // - Space Complexity: O(N) where N is the total number of students.
-    std::unordered_map<int, double> studentExpMap;
+    HashMap<int, double> rawScore;            // studentId -> accumulated weighted points
+    HashMap<int, double> expMap;              // studentId -> normalised EXP (0..10000)
+    HashMap<std::string, int> dailyCount;     // "studentId|date" -> approved items that day
+    AVLTree board;                            // the leaderboard
 
-    // Internal Raw Score Tracker:
-    // Tracks accumulated un-normalized weighted raw points before log scaling.
-    // Time Complexity:  O(1) Average
-    // Space Complexity: O(N)
-    std::unordered_map<int, double> studentRawScoreMap;
-
-    // ------------------------------------------------------------------------
-    // 2. DATA STRUCTURE: std::set<std::pair<double, int>, std::greater<...>> dynamicLeaderboard
-    // ------------------------------------------------------------------------
-    // WHY USED:
-    // - Self-Balancing Binary Search Tree (Red-Black Tree).
-    // - Maintains (EXP, studentId) pairs in strict DESCENDING order.
-    // - Guarantees fast real-time re-ranking without sorting the entire dataset:
-    //    * Node Deletion: O(log N)
-    //    * Node Insertion: O(log N)
-    //    * Top-K Traversal: O(K)
-    //    * Max EXP read: O(1) (*begin())
-    // - Space Complexity: O(N) tree nodes.
-    std::set<std::pair<double, int>, std::greater<std::pair<double, int>>> dynamicLeaderboard;
-
-    // ------------------------------------------------------------------------
-    // MATHEMATICAL SCORING ENGINE (Helper Functions)
-    // ------------------------------------------------------------------------
-    
-    // Category Multiplier: Maps achievement domain to impact factor
-    // Time Complexity:  O(1)
-    // Space Complexity: O(1)
-    double getCategoryWeight(AchievementCategory category) const {
-        switch (category) {
-            case AchievementCategory::INTERNSHIP:               return 5.0; // High impact industry experience
-            case AchievementCategory::COMPETITIVE_PROGRAMMING:  return 3.5; // Core DSA & algorithmic proficiency
-            case AchievementCategory::OPEN_SOURCE:              return 2.5; // Real-world collaborative dev
-            case AchievementCategory::CERTIFICATION:            return 1.0; // Coursework & foundational certs
-            case AchievementCategory::GENERAL:
-            default:                                            return 1.0;
-        }
+    // Anti-spam curve: the more items a student gets scored on ONE day,
+    // the less each extra item is worth.            O(1)
+    static double dailyDecay(int countToday) {
+        if (countToday <= 5)  return 1.0;     // items 1-5 : full credit
+        if (countToday <= 10) return 0.4;     // items 6-10: 40%
+        return 0.1;                           // items 11+ : 10%
     }
 
-    // Platform Difficulty Multiplier: Normalizes score across contest platforms
-    // Time Complexity:  O(P) where P is platform string length
-    // Space Complexity: O(1) auxiliary
-    double getPlatformMultiplier(std::string platform) const {
-        std::transform(platform.begin(), platform.end(), platform.begin(), ::tolower);
-        if (platform == "codeforces") return 2.5; // Highest algorithmic difficulty
-        if (platform == "codechef")   return 1.8;
-        if (platform == "leetcode")   return 1.2;
-        if (platform == "hackerrank") return 0.8;
-        return 1.0;                               // Default multiplier for unspecified platforms
-    }
-
-    // Dynamic Daily Activity Decay (Anti-Spam Algorithm):
-    // Diminishing returns curve preventing exploitation from spamming low-effort PRs.
-    // - Contributions 1-5:  1.0x (100% full points)
-    // - Contributions 6-10: 0.4x (40% points)
-    // - Contributions 11+:  0.1x (10% spam cap)
-    // Time Complexity:  O(1)
-    // Space Complexity: O(1)
-    double getDailyActivityDecay(int dailyActivityCount) const {
-        if (dailyActivityCount <= 5)  return 1.0;
-        if (dailyActivityCount <= 10) return 0.4;
-        return 0.1;
-    }
-
-    // Logarithmic Feature Scaling (Score Normalization):
-    // Maps raw cumulative points smoothly to a bounded 0 - 10,000 EXP scale.
-    // Formula: EXP = min(10000.0, 10000.0 * (ln(1 + rawScore) / ln(1 + 50000)))
-    // WHY LOGARITHMIC:
-    // Prevents runaway scores, rewards early consistency, and creates competitive tier bands.
-    // Time Complexity:  O(1)
-    // Space Complexity: O(1)
-    double normalizeRawScore(double rawScore) const {
-        if (rawScore <= 0.0) return 0.0;
+    // LOGARITHMIC NORMALISATION: raw points can grow without limit, EXP cannot.
+    //   EXP = 10000 * ln(1 + raw) / ln(1 + 50000), capped at 10000.
+    // Early points move EXP a lot, later points move it less (diminishing returns),
+    // so one huge achievement cannot dominate the whole board.         O(1)
+    static double normalize(double raw) {
+        if (raw <= 0.0) return 0.0;
         const double MAX_EXP = 10000.0;
-        const double SATURATION_POINT = 50000.0; // Raw points needed for theoretical max 10,000 EXP
-        double normalized = MAX_EXP * (std::log(1.0 + rawScore) / std::log(1.0 + SATURATION_POINT));
-        return std::min(MAX_EXP, normalized);
-    }
-
-    // Assigns competitive tier badges based on normalized EXP milestones
-    // Time Complexity:  O(1)
-    // Space Complexity: O(1)
-    std::string getTierBadge(double exp) const {
-        if (exp >= 9000.0) return "Grandmaster [Diamond]";
-        if (exp >= 7000.0) return "Master      [Platinum]";
-        if (exp >= 4500.0) return "Expert      [Gold]";
-        if (exp >= 2000.0) return "Specialist  [Silver]";
-        return                    "Candidate   [Bronze]";
+        const double SATURATION = 50000.0;    // raw points that reach MAX_EXP
+        double exp = MAX_EXP * std::log(1.0 + raw) / std::log(1.0 + SATURATION);
+        return exp < MAX_EXP ? exp : MAX_EXP;
     }
 
 public:
-    RankEngine() = default;
+    // Try to score one achievement for its student.
+    // Returns false if it is not Approved, or was already scored (score-once guard).
+    // Cost: O(1) hash work + O(log N) tree erase + O(log N) tree insert = O(log N).
+    bool applyAchievement(Student& student, Achievement& ach) {
+        if (!ach.tryConsumeForScoring()) return false;       // Pending/Rejected/duplicate
+        student.linkAchievement(&ach);
 
-    // ------------------------------------------------------------------------
-    // API 1: PROCESS ACHIEVEMENT
-    // ------------------------------------------------------------------------
-    // Validates achievement, calculates weighted points, updates O(1) hash map,
-    // and dynamically re-indexes the Red-Black Tree in O(log N).
-    //
-    // Time Complexity:
-    // - Verification & Multipliers: O(1)
-    // - BST Node Erase:            O(log N)
-    // - Hash Map Update:           O(1) Average
-    // - BST Node Insert:           O(log N)
-    // - Total Time Complexity:     O(log N)
-    //
-    // Space Complexity: O(1) auxiliary memory per call.
-    void processAchievement(Student* student, Achievement* ach, 
-                            std::string platform = "", int dailyActivityCount = 1) {
-        if (student == nullptr || ach == nullptr) {
-            std::cerr << "[RankEngine Error]: Null student or achievement pointer." << std::endl;
-            return;
-        }
+        int sid = student.getStudentId();
 
-        // Integrity Check: Unverified achievements cannot affect rankings
-        if (!ach->isVerified()) {
-            std::cout << "[RankEngine Info]: Achievement ID " << ach->getId() 
-                      << " is PENDING verification. EXP unchanged." << std::endl;
-            return;
-        }
+        // 1) daily activity count for this student on this date
+        std::string dayKey = std::to_string(sid) + "|" + ach.getDate();
+        int* dayPtr = dailyCount.find(dayKey);
+        int countToday = (dayPtr != nullptr ? *dayPtr : 0) + 1;
+        dailyCount.put(dayKey, countToday);
 
-        // Link achievement to student collection
-        const auto& existingList = student->getAchievements();
-        if (std::find(existingList.begin(), existingList.end(), ach) == existingList.end()) {
-            student->addAchievement(ach);
-        }
+        // 2) weighted points (category x platform) and anti-spam decay for gains
+        double delta = ach.weightedPoints();
+        if (delta > 0.0) delta *= dailyDecay(countToday);
 
-        int studentId = student->getStudentId();
-        double baseScore = ach->getScore();
-        double weightedDelta = 0.0;
+        // 3) accumulate raw score (never below zero)
+        double* rawPtr = rawScore.find(sid);
+        double raw = (rawPtr != nullptr ? *rawPtr : 0.0) + delta;
+        if (raw < 0.0) raw = 0.0;
+        rawScore.put(sid, raw);
 
-        // Competitive Programming Rating Penalty:
-        // Negative deltas are cushioned by 0.3x to prevent disproportionate demotions
-        if (baseScore < 0.0) {
-            weightedDelta = baseScore * 0.3;
-        } else {
-            double catWeight = getCategoryWeight(ach->getCategory());
-            double platMult  = getPlatformMultiplier(platform);
-            double actDecay  = getDailyActivityDecay(dailyActivityCount);
-            weightedDelta = baseScore * catWeight * platMult * actDecay;
-        }
-
-        // Update raw points accumulator
-        double currentRaw = studentRawScoreMap[studentId];
-        double updatedRaw = std::max(0.0, currentRaw + weightedDelta);
-        studentRawScoreMap[studentId] = updatedRaw;
-
-        // Compute normalized EXP
-        double newExp = normalizeRawScore(updatedRaw);
-
-        // --------------------------------------------------------------------
-        // DSA: BST RE-INDEXING (O(log N))
-        // --------------------------------------------------------------------
-        // Remove outdated node if student already existed in leaderboard
-        if (studentExpMap.find(studentId) != studentExpMap.end()) {
-            double oldExp = studentExpMap[studentId];
-            dynamicLeaderboard.erase({oldExp, studentId}); // O(log N)
-        }
-
-        // Store updated EXP in O(1) hash map
-        studentExpMap[studentId] = newExp;
-
-        // Re-insert updated (EXP, studentId) node into Red-Black Tree
-        dynamicLeaderboard.insert({newExp, studentId}); // O(log N)
-
-        std::cout << "[RankEngine Success]: Processed '" << ach->getTitle() 
-                  << "' for " << student->getName() 
-                  << " | Delta: +" << std::fixed << std::setprecision(1) << weightedDelta
-                  << " | EXP: " << std::fixed << std::setprecision(2) << newExp << std::endl;
+        // 4) new EXP, then re-index the leaderboard
+        double newExp = normalize(raw);
+        double* oldPtr = expMap.find(sid);
+        if (oldPtr != nullptr) board.erase(RankKey(*oldPtr, sid));   // remove OLD node
+        expMap.put(sid, newExp);
+        board.insert(RankKey(newExp, sid));                          // add NEW node
+        return true;
     }
 
-    // ------------------------------------------------------------------------
-    // API 2: GET TOP-K STUDENTS
-    // ------------------------------------------------------------------------
-    // Traverses the top K nodes of the Balanced BST in descending order.
-    //
-    // Time Complexity:  O(K) where K is the requested number of top ranks.
-    // Space Complexity: O(K) to store result pairs.
-    std::vector<std::pair<int, double>> getTopK(int k) const {
-        std::vector<std::pair<int, double>> topK;
-        if (k <= 0) return topK;
-
-        int count = 0;
-        // In-order traversal starting from the root/max node
-        for (auto it = dynamicLeaderboard.begin(); 
-             it != dynamicLeaderboard.end() && count < k; ++it, ++count) {
-            topK.push_back({it->second, it->first}); // {studentId, EXP}
-        }
-        return topK;
+    // First k students, best first.  O(k + log N)
+    DynArray<RankKey> getTopK(int k) const {
+        DynArray<RankKey> result;
+        board.topK(k, result);
+        return result;
     }
 
-    // ------------------------------------------------------------------------
-    // API 3: GET STUDENT RANK POSITION
-    // ------------------------------------------------------------------------
-    // Computes the exact 1-indexed rank position of a given student.
-    //
-    // Time Complexity:  O(N) linear scan over BST nodes in worst case.
-    // Space Complexity: O(1) auxiliary.
-    int getStudentRank(int studentId) const {
-        auto itMap = studentExpMap.find(studentId);
-        if (itMap == studentExpMap.end()) return -1; // Not found
-
-        double exp = itMap->second;
-        int rank = 1;
-        for (const auto& entry : dynamicLeaderboard) {
-            if (entry.second == studentId && entry.first == exp) return rank;
-            rank++;
-        }
-        return -1;
+    // 1-based rank, or -1 if the student has no scored achievement.  O(log N)
+    int getRank(int studentId) const {
+        const double* e = expMap.find(studentId);
+        if (e == nullptr) return -1;
+        return board.rankOf(RankKey(*e, studentId));
     }
 
-    // Fast O(1) lookup for current student EXP
-    // Time Complexity:  O(1) Average
-    // Space Complexity: O(1)
-    double getStudentExp(int studentId) const {
-        auto it = studentExpMap.find(studentId);
-        return (it != studentExpMap.end()) ? it->second : 0.0;
+    // Current EXP (0.0 if unranked).  O(1)
+    double getExp(int studentId) const {
+        const double* e = expMap.find(studentId);
+        return e != nullptr ? *e : 0.0;
     }
 
-    // ------------------------------------------------------------------------
-    // API 4: DISPLAY LEADERBOARD TABLE
-    // ------------------------------------------------------------------------
-    // Generates a cleanly formatted text report of all ranked students.
-    //
-    // Time Complexity:  O(N) where N is number of ranked students.
-    // Space Complexity: O(1) auxiliary.
-    void displayLeaderboard(const std::unordered_map<int, Student*>& studentRegistry) const {
-        std::cout << "\n=========================================================================================\n";
-        std::cout << "                           GEU FORGE DYNAMIC LEADERBOARD                                 \n";
-        std::cout << "=========================================================================================\n";
-        std::cout << std::left 
-                  << std::setw(6)  << "Rank"
-                  << std::setw(12) << "Student ID"
-                  << std::setw(20) << "Name"
-                  << std::setw(12) << "EXP"
-                  << std::setw(24) << "Tier / Status"
-                  << std::setw(18) << "GitHub"
-                  << std::endl;
-        std::cout << "-----------------------------------------------------------------------------------------\n";
+    int rankedCount() const { return board.size(); }
+    int boardHeight() const { return board.height(); }
 
-        if (dynamicLeaderboard.empty()) {
-            std::cout << "                         No students currently ranked.                           \n";
-        } else {
-            int rank = 1;
-            for (const auto& entry : dynamicLeaderboard) {
-                double exp = entry.first;
-                int id = entry.second;
-                std::string name = "Unknown";
-                std::string github = "N/A";
+    // Debug/test helper: is the leaderboard tree still a valid AVL tree?
+    bool boardIsBalanced() const { return board.isBalanced(); }
 
-                auto regIt = studentRegistry.find(id);
-                if (regIt != studentRegistry.end() && regIt->second != nullptr) {
-                    name = regIt->second->getName();
-                    if (!regIt->second->getGithub().empty()) {
-                        github = regIt->second->getGithub();
-                    }
-                }
-
-                std::cout << std::left 
-                          << std::setw(6)  << ("#" + std::to_string(rank))
-                          << std::setw(12) << id
-                          << std::setw(20) << name
-                          << std::setw(12) << std::fixed << std::setprecision(2) << exp
-                          << std::setw(24) << getTierBadge(exp)
-                          << std::setw(18) << github
-                          << std::endl;
-                rank++;
-            }
-        }
-        std::cout << "=========================================================================================\n\n";
+    // Badge shown next to the EXP.  O(1)
+    static std::string tierBadge(double exp) {
+        if (exp >= 9000.0) return "Grandmaster";
+        if (exp >= 7000.0) return "Master";
+        if (exp >= 4500.0) return "Expert";
+        if (exp >= 2000.0) return "Specialist";
+        return "Candidate";
     }
 };
