@@ -128,6 +128,7 @@ flowchart LR
 - **Verification:** a one-way state machine (Pending to Approved or Rejected), the score-once guard, and the first FastAPI version of the submission and review endpoints.
 
 ### Divyanshi Purohit
+#Reviewed and tested my part of the project
 
 - **OOP:** abstract `User` and derived `Student` (inheritance), a skills set and achievement list inside each student (composition), const-correct getters, and non-owning pointers. `SearchEngine` has-a Trie, HashSet and HashMap (composition), keeps them private (encapsulation), and builds a MinHeap inside each search.
 - **Search engine (`SearchEngine.h`):** tokenizer (`c++` becomes `cpp`), weighted fields (name and roll above skills above the rest), AND search across words, edit distance (dynamic programming, O(m·n)) so small typos like "pyhton" still match, and min-heap top-K. Built on the lead's Trie and MinHeap.
