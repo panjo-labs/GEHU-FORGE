@@ -122,6 +122,7 @@ flowchart LR
 - **Tests:** `test_structures.cpp` (46 checks; the random AVL test uses STL as an independent reference).
 
 ### Manya Singh
+#Reviewed and tested my part of the project
 
 - **OOP:** abstract base class `Achievement` with pure virtual functions. Six derived types (Coding, Certificate, Open source, Internship, DSA, Academic) override the weight and platform multiplier, which is runtime polymorphism. It has a virtual destructor and a template-method `weightedPoints()`.
 - **DSA:** `LinkedQueue<T>`, a FIFO queue with front and rear pointers (O(1) enqueue and dequeue), which drives the review order.
