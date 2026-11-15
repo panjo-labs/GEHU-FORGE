@@ -205,7 +205,7 @@ def dashboard(sid):
         "exp": exp, "expWeekAgo": e[2] if e else 0, "move": movement("all", sid),
         "tier": tier_json(tier), "nextTier": tier_json(nt), "top": top_percent(rank, forge.counts.get("all", 0)),
         "categories": cats, "milestones": milestones[:3], "board": board, "activity": activity,
-        "weekStreak": ctx["streak"], "pending": sum(1 for a in mine if a["status"] == "pending"),
+        "weekStreak": ctx["streak"], "consistency": forge.bonus.get(sid), "pending": sum(1 for a in mine if a["status"] == "pending"),
         "recent": [ach_json(a) for a in mine[:5]], "badges": badge_list,
     }
 

@@ -8,6 +8,7 @@ from datetime import date, datetime
 from sqlalchemy import func, insert, select
 
 from .config import ADMIN_EMAIL, ADMIN_PASSWORD, CACHE_DIR, SEED_FILE
+from .activity import seed_if_empty as seed_activity
 from .db import achievements, create_all, engine, reset_sequences, students
 from .scoring import weighted_points
 from .security import hash_password
@@ -61,6 +62,8 @@ def seed_if_empty():
             conn.execute(insert(achievements), arows)
             reset_sequences(conn)
             log.info("Seeded %d students and %d achievements", len(srows), len(arows))
+        if seed_activity(conn):
+            log.info("Seeded synthetic daily activity")
         ensure_admin(conn)
 
 

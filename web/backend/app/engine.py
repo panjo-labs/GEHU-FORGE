@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import delete, insert, select
 
 from .config import CACHE_DIR, ENGINE_PATH, ENGINE_SOURCE
+from .activity import recent_days, today
 from .db import achievements, engine as db, scores, students, utcnow
 from .scoring import CATEGORY
 
@@ -34,7 +35,9 @@ class ForgeEngine:
         # cache[category][student_id] = (exp, rank, prev_exp, prev_rank)
         self.cache = {}
         self.counts = {}
+        self.bonus = {}           # sid -> consistency (multiplier, streak, active days, weeks)
         self.computed_at = None
+        self.last_load = None     # engine restart ho toh yahi LOAD dobara bhejte hain
 
     def ensure_binary(self):
         if ENGINE_PATH.exists():
@@ -63,25 +66,34 @@ class ForgeEngine:
             except Exception:
                 self.proc.kill()
 
+    def _send(self, command):
+        try:
+            self.proc.stdin.write(command + "\n")
+            self.proc.stdin.flush()
+        except OSError:
+            raise EngineError("C++ engine stopped unexpectedly.")
+        lines = []
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                raise EngineError("C++ engine stopped unexpectedly.")
+            line = line.rstrip("\n")
+            if line == "END":
+                return lines
+            lines.append(line)
+
     def _call(self, command):
-        # Command bhejo, "END" tak lines padho. Process mar gaya toh dobara start
+        # Command bhejo, "END" tak lines padho. Process mar gaya toh dobara start + data dobara LOAD
         with self.lock:
             if self.proc is None or self.proc.poll() is not None:
                 self.proc = subprocess.Popen(
                     [str(ENGINE_PATH)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                     text=True, encoding="utf-8", bufsize=1,
                 )
-            self.proc.stdin.write(command + "\n")
-            self.proc.stdin.flush()
-            lines = []
-            while True:
-                line = self.proc.stdout.readline()
-                if not line:
-                    raise EngineError("C++ engine stopped unexpectedly.")
-                line = line.rstrip("\n")
-                if line == "END":
-                    break
-                lines.append(line)
+                if self.last_load and not command.startswith("LOAD"):
+                    log.warning("C++ engine restarted, reloading data")
+                    self._send(self.last_load)
+            lines = self._send(command)
         if lines and lines[0].startswith("ERR"):
             raise EngineError(lines[0])
         return lines
@@ -95,11 +107,12 @@ class ForgeEngine:
             arows = c.execute(
                 select(achievements).where(achievements.c.status == "approved").order_by(achievements.c.id)
             ).mappings().all()
+            active = recent_days(c)
         with open(s_path, "w", encoding="utf-8", newline="\n") as f:
             for s in srows:
                 f.write("\t".join(_clean(x) for x in (
                     s["id"], s["name"], s["roll_no"], s["branch"], s["grad_year"], s["campus"],
-                    ";".join(s["skills"] or []), s["headline"])) + "\n")
+                    ";".join(s["skills"] or []), s["headline"], ";".join(active.get(s["id"], [])))) + "\n")
         with open(a_path, "w", encoding="utf-8", newline="\n") as f:
             for a in arows:
                 f.write("\t".join(_clean(x) for x in (
@@ -107,9 +120,16 @@ class ForgeEngine:
                     a["score"], a["platform"], _iso(a["reviewed_at"]))) + "\n")
 
         as_of = _iso(utcnow() - timedelta(days=7))
-        self._call(f"LOAD\t{s_path}\t{a_path}\t{as_of}")
-        cache, counts, rows = {}, {}, []
+        load = f"LOAD\t{s_path}\t{a_path}\t{as_of}\t{today().isoformat()}"
+        self._call(load)
+        self.last_load = load
+        cache, counts, rows, bonus = {}, {}, [], {}
         for line in self._call("RANK"):
+            if line.startswith("bonus\t"):
+                _, sid, mult, streak, active30, weeks = line.split("\t")
+                bonus[int(sid)] = {"multiplier": float(mult), "loginStreak": int(streak),
+                                   "activeDays30": int(active30), "weekStreak": int(weeks)}
+                continue
             cat, sid, exp, rank, pexp, prank = line.split("\t")
             sid, rank, prank = int(sid), int(rank), int(prank)
             entry = (float(exp), rank, float(pexp), prank if prank > 0 else None)
@@ -121,7 +141,11 @@ class ForgeEngine:
             c.execute(delete(scores))
             if rows:
                 c.execute(insert(scores), rows)
-        self.cache, self.counts, self.computed_at = cache, counts, datetime.now()
+        self.cache, self.counts, self.bonus, self.computed_at = cache, counts, bonus, datetime.now()
+
+    def invalidate(self):
+        # Agli fresh() call pe dobara compute
+        self.computed_at = None
 
     def fresh(self):
         # "Pichhle hafte" wala comparison purana na ho jaye, isliye ghante mein ek baar refresh

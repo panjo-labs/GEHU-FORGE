@@ -9,6 +9,7 @@
 #include "../Verification.h"
 #include "../RankEngine.h"
 #include "../Storage.h"
+#include "../Consistency.h"
 
 static bool near(double a, double b) { return std::fabs(a - b) < 0.01; }
 
@@ -79,7 +80,7 @@ static void testRankEngine() {
     CHECK(!engine.applyAchievement(s1, big));
     CHECK(engine.rankedCount() == 2 && engine.getRank(3) == -1);
 
-    double expected = 10000.0 * std::log(15001.0) / std::log(50001.0);
+    double expected = 8000.0 * (1.0 - std::exp(-15000.0 / 6000.0));
     CHECK(near(engine.getExp(1), expected));
     CHECK(engine.getRank(1) == 1 && engine.getRank(2) == 2);
 
@@ -112,9 +113,43 @@ static void testDailyDecay() {
         engine.applyAchievement(s, *a);
     }
     double raw = 5 * 100.0 + 5 * 100.0 * 0.4 + 2 * 100.0 * 0.1;
-    double expected = 10000.0 * std::log(1.0 + raw) / std::log(50001.0);
+    double expected = 8000.0 * (1.0 - std::exp(-raw / 6000.0));
     CHECK(near(engine.getExp(1), expected));
     for (int i = 0; i < items.size(); ++i) delete items[i];
+}
+
+static void testConsistency() {
+    // Din number: lagatar din = +1, mahina/saal badalne pe bhi
+    CHECK(dayNumber("1970-01-01") == 0);
+    CHECK(dayNumber("2026-03-01") - dayNumber("2026-02-28") == 1);
+    CHECK(dayNumber("2026-01-01") - dayNumber("2025-12-31") == 1);
+    CHECK(dayNumber("bad") == -1);
+
+    int today = dayNumber("2026-11-15");
+    HashSet<int> active, achieved, none;
+    for (int i = 1; i <= 10; ++i) active.add(today - i);   // kal tak 10 din lagatar (aaj abhi nahi aaya)
+    active.add(today - 20);                                // beech mein gap
+    for (int w = 0; w < 3; ++w) achieved.add(today - 7 * w - 2);
+
+    ConsistencyInfo c = Consistency::at(active, achieved, today);
+    CHECK(c.loginStreak == 10);
+    CHECK(c.activeDays30 == 11);
+    CHECK(c.weekStreak == 3);
+    double m = 1.0 + 0.10 * 11 / 30.0 + 0.05 * 10 / 30.0 + 0.10 * 3 / 8.0;
+    CHECK(near(c.multiplier, m));
+
+    ConsistencyInfo zero = Consistency::at(none, none, today);
+    CHECK(zero.loginStreak == 0 && zero.weekStreak == 0 && near(zero.multiplier, 1.0));
+
+    // Multiplier lagte hi rank badalta hai; sirf achievements se max 8000
+    RankEngine engine;
+    engine.addPoints(1, 3000.0);
+    engine.addPoints(2, 3200.0);
+    CHECK(engine.getRank(2) == 1);
+    engine.setMultiplier(1, 1.25);
+    CHECK(engine.getRank(1) == 1 && engine.boardIsBalanced());
+    CHECK(near(engine.getExp(1), RankEngine::baseExp(3000.0) * 1.25));
+    CHECK(RankEngine::baseExp(1e9) <= 8000.0 && RankEngine::baseExp(1e9) > 7999.0);
 }
 
 static void testStudentAndStore() {
@@ -193,6 +228,7 @@ int main() {
     testVerificationQueue();
     testRankEngine();
     testDailyDecay();
+    testConsistency();
     testStudentAndStore();
     testLargeScale();
     return finishTests("test_pipeline");

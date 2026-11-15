@@ -7,7 +7,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 
 from .config import JWT_SECRET, TOKEN_DAYS
+from .activity import mark_active
 from .db import engine, students
+from .engine import forge
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -44,6 +46,9 @@ def current_user(creds: HTTPAuthorizationCredentials | None = Depends(bearer)):
         row = c.execute(select(students.c.id, students.c.role).where(students.c.id == uid)).first()
     if row is None:
         raise HTTPException(401, "Your account was not found. Sign in again.")
+    # Aaj pehli baar aaya -> streak badla, agli baar rank dobara nikalo
+    if row.role == "student" and mark_active(row.id):
+        forge.invalidate()
     return {"id": row.id, "role": row.role}
 
 

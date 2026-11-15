@@ -94,6 +94,13 @@ scores = Table(
     Column("updated_at", DateTime, nullable=False, default=utcnow),
 )
 
+# Har din jab student platform kholta hai: ek row. Login streak aur "active days" isi se
+activity = Table(
+    "activity", metadata,
+    Column("student_id", Integer, ForeignKey("students.id", ondelete="CASCADE"), primary_key=True),
+    Column("day", Date, primary_key=True),
+)
+
 engine = create_engine(DATABASE_URL, future=True, pool_pre_ping=True)
 
 if engine.dialect.name == "sqlite":

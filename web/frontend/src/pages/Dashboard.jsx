@@ -91,6 +91,13 @@ export default function Dashboard() {
             <b className="display">{d.weekStreak ? `${d.weekStreak}-WEEK STREAK` : 'NO STREAK YET'}</b>
           </div>
           <WeekDots activity={d.activity} now={now} />
+          {d.consistency && (
+            <p className="consistency" title="Open Forge daily and add achievements every week to raise this bonus (up to +25%).">
+              <span><b className="num">{d.consistency.loginStreak}</b>-day visit streak</span>
+              <span><b className="num">{d.consistency.activeDays30}</b>/30 active days</span>
+              <span className="bonus">Consistency bonus <b className="num">+{Math.round((d.consistency.multiplier - 1) * 100)}%</b></span>
+            </p>
+          )}
         </div>
       </section>
 

@@ -58,5 +58,7 @@ Set `DATABASE_URL` in `.env` to the Supabase Postgres connection string (`postgr
 
 - A submission starts as `pending`. Only `pending` can change, and the update is conditional (`WHERE status = 'pending'`), so two reviewers cannot both decide it.
 - EXP is recomputed by the C++ engine from approved rows only, so an achievement can never be counted twice.
+- Each student visit is recorded once per day in `activity`. The engine uses it for the consistency bonus (visit streak, active days), together with weekly achievement streaks.
+- If the C++ process crashes, the API restarts it and replays the last `LOAD` before the next command.
 - Rejecting needs a note. The reviewer can lower the claimed points before approving.
 - Automatic checks use only free public APIs: Codeforces (`user.rating`, no key) and GitHub (pull requests and repositories, 60 requests per hour without a token). Student links are never fetched directly.

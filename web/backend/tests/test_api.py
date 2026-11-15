@@ -131,3 +131,20 @@ def test_wrong_password_and_token(client):
     assert r.status_code == 422
     assert client.get("/api/dashboard", headers=auth("garbage")).status_code == 401
     assert client.get("/api/dashboard").status_code == 401
+
+
+def test_daily_visit_counts_for_consistency(client):
+    tok = signup(client, email="streak.student@gehu.ac.in", roll="2612510998").json()["token"]
+    d = client.get("/api/dashboard", headers=auth(tok)).json()
+    c = d["consistency"]
+    assert c["loginStreak"] == 1 and c["activeDays30"] == 1
+    assert 1.0 < c["multiplier"] <= 1.25
+
+
+def test_engine_restart_reloads_data(client):
+    from app.engine import forge
+    forge.proc.kill()
+    forge.proc.wait()
+    # Restart ke baad bhi search chalna chahiye (LOAD dobara bheja jata hai)
+    r = client.get("/api/leaderboard?q=python", headers=auth(reviewer(client)))
+    assert r.status_code == 200 and r.json()["rows"]
