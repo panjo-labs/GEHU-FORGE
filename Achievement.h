@@ -1,48 +1,39 @@
-#pragma once // HEADER GUARD
+#pragma once
+
+// Achievement ka abstract base class + uske derived types + factory.
+// Runtime polymorphism: Achievement* se sahi override wala function chalta hai.
 
 #include <iostream>
 #include <string>
 #include <cctype>
 
-// ============================================================================
-// ENUMS  (enum class = strongly typed: you must write AchievementCategory::OPEN_SOURCE)
-// ============================================================================
 enum class AchievementCategory {
-    INTERNSHIP,               // industry experience
-    COMPETITIVE_PROGRAMMING,  // contests, problem solving
-    OPEN_SOURCE,              // GitHub contributions
-    CERTIFICATION,            // courses and exams
+    INTERNSHIP,
+    COMPETITIVE_PROGRAMMING,
+    OPEN_SOURCE,
+    CERTIFICATION,
+    DSA,
+    ACADEMIC,
     GENERAL
 };
 
-// The life of a submission:   Pending --approve()--> Approved
-//                             Pending --reject() --> Rejected
-// Approved and Rejected are FINAL (no way back). This is a tiny "state machine".
+// Chhota state machine: Pending -> Approved ya Rejected. Dono FINAL hain.
 enum class VerificationStatus { Pending, Approved, Rejected };
 
-// ============================================================================
-// ABSTRACT BASE CLASS: Achievement
-// ============================================================================
-// ABSTRACT = has at least one pure virtual function (= 0), so you can never
-// create a plain Achievement. You can only create CodingAchievement,
-// CertificateAchievement, etc. Code that handles any kind of achievement uses
-// an 'Achievement*' and the right overridden function runs at run time
-// (RUNTIME POLYMORPHISM).
+// Abstract class (pure virtual = 0), isliye seedha object nahi ban sakta.
 class Achievement {
 protected:
-    // ENCAPSULATION: data is hidden. Outside code cannot set 'status' directly;
-    // it must call approve() / reject(), which enforce the rules.
+    // status bahar se direct set nahi hota - approve()/reject() se hi badlega.
     int id;
-    int studentId;                 // owner of this achievement
+    int studentId;
     std::string title;
     std::string date;              // "DD-MM-YYYY"
-    int score;                     // raw base points claimed
-    std::string proof;             // link or file name
-    VerificationStatus status;     // starts as Pending
-    bool pointsApplied;            // true once RankEngine has added the points
+    int score;
+    std::string proof;
+    VerificationStatus status;
+    bool pointsApplied;            // RankEngine ne points jod diye toh true
     AchievementCategory category;
 
-    // Shared printing code for all derived display() functions.
     void printCommon() const {
         std::cout << "  ID: " << id << " | Student: " << studentId << "\n"
                   << "  Title: " << title << "\n"
@@ -52,35 +43,30 @@ protected:
     }
 
 public:
-    // Constructor with a MEMBER INITIALIZER LIST (builds members directly, no extra copy).
     Achievement(int id, int studentId, const std::string& title, const std::string& date,
                 int score, const std::string& proof, AchievementCategory category)
         : id(id), studentId(studentId), title(title), date(date), score(score),
           proof(proof), status(VerificationStatus::Pending), pointsApplied(false),
           category(category) {}
 
-    // VIRTUAL DESTRUCTOR: DataStore deletes objects through Achievement* pointers.
-    // Without 'virtual' only the base part would be destroyed (undefined behaviour).
+    // Virtual destructor zaroori hai - DataStore Achievement* se delete karta hai.
     virtual ~Achievement() {}
 
-    // ---- pure virtual: every concrete achievement MUST provide these ------
     virtual void display() const = 0;
-    virtual double categoryWeight() const = 0;     // importance of this category
-    virtual std::string typeName() const = 0;      // text used in CSV files
+    virtual double categoryWeight() const = 0;
+    virtual std::string typeName() const = 0;      // CSV mein yahi text jata hai
 
-    // ---- virtual with a sensible default (derived classes MAY override) ---
     virtual double platformMultiplier() const { return 1.0; }
     virtual double basePoints() const { return static_cast<double>(score); }
 
-    // TEMPLATE-METHOD style: fixed recipe, customised by the virtual parts above.
-    // A negative score (e.g. contest rating loss) is cushioned to 30%.
+    // Negative score (rating loss) ko 30% tak naram karo.
     double weightedPoints() const {
         double base = basePoints();
         if (base < 0.0) return base * 0.3;
         return base * categoryWeight() * platformMultiplier();
     }
 
-    // ---- state machine: only a Pending submission may change --------------
+    // Sirf Pending wala hi approve/reject ho sakta hai.
     bool approve() {
         if (status != VerificationStatus::Pending) return false;
         status = VerificationStatus::Approved;
@@ -92,15 +78,13 @@ public:
         return true;
     }
 
-    // SCORE-ONCE GUARD (check AND set in ONE call, so it cannot be forgotten):
-    // returns true only the first time an Approved achievement asks to be scored.
+    // Score-once guard: check + set ek hi call mein. Pehli baar hi true milega.
     bool tryConsumeForScoring() {
         if (status != VerificationStatus::Approved || pointsApplied) return false;
         pointsApplied = true;
         return true;
     }
 
-    // ---- getters (const = they never change the object) -------------------
     int getId() const { return id; }
     int getStudentId() const { return studentId; }
     const std::string& getTitle() const { return title; }
@@ -122,11 +106,7 @@ public:
     }
 };
 
-// ============================================================================
-// DERIVED CLASSES  (INHERITANCE: "a CodingAchievement IS-A Achievement")
-// ============================================================================
-
-// Competitive programming. Also knows its contest PLATFORM, which changes the points.
+// Competitive programming - platform ke hisaab se points badalte hain.
 class CodingAchievement : public Achievement {
 private:
     std::string platform;
@@ -149,7 +129,7 @@ public:
     double categoryWeight() const override { return 3.5; }
     std::string typeName() const override { return "CODING"; }
 
-    // OVERRIDE of the default: harder platforms are worth more.
+    // Mushkil platform = zyada multiplier.
     double platformMultiplier() const override {
         std::string p = lower(platform);
         if (p == "codeforces") return 2.5;
@@ -198,12 +178,30 @@ public:
     void display() const override { std::cout << "[Internship]\n"; printCommon(); }
 };
 
-// ============================================================================
-// FACTORY FUNCTION
-// ============================================================================
-// Builds the right derived object from a text type ("CODING", "CERT", "OSS",
-// "INTERN"). The CSV loader and the CLI both need this, so it lives in ONE place.
-// Returns a NEW object (caller/DataStore owns it) or nullptr for unknown types.
+class DSAAchievement : public Achievement {
+public:
+    DSAAchievement(int id, int studentId, const std::string& title, const std::string& date,
+                   int score, const std::string& proof)
+        : Achievement(id, studentId, title, date, score, proof, AchievementCategory::DSA) {}
+
+    double categoryWeight() const override { return 3.0; }
+    std::string typeName() const override { return "DSA"; }
+    void display() const override { std::cout << "[DSA]\n"; printCommon(); }
+};
+
+class AcademicAchievement : public Achievement {
+public:
+    AcademicAchievement(int id, int studentId, const std::string& title, const std::string& date,
+                        int score, const std::string& proof)
+        : Achievement(id, studentId, title, date, score, proof, AchievementCategory::ACADEMIC) {}
+
+    double categoryWeight() const override { return 1.5; }
+    std::string typeName() const override { return "ACAD"; }
+    void display() const override { std::cout << "[Academic]\n"; printCommon(); }
+};
+
+// Factory: type text se sahi derived object banao. Naya object caller/DataStore own karta hai.
+// Unknown type par nullptr.
 inline Achievement* createAchievement(const std::string& type, int id, int studentId,
                                       const std::string& title, const std::string& date,
                                       int score, const std::string& proof,
@@ -212,5 +210,7 @@ inline Achievement* createAchievement(const std::string& type, int id, int stude
     if (type == "CERT")   return new CertificateAchievement(id, studentId, title, date, score, proof);
     if (type == "OSS")    return new OpenSourceAchievement(id, studentId, title, date, score, proof);
     if (type == "INTERN") return new InternshipAchievement(id, studentId, title, date, score, proof);
+    if (type == "DSA")    return new DSAAchievement(id, studentId, title, date, score, proof);
+    if (type == "ACAD")   return new AcademicAchievement(id, studentId, title, date, score, proof);
     return nullptr;
 }

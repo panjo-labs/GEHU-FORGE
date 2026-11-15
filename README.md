@@ -2,15 +2,66 @@
 
 A competitive profile platform for Graphic Era Hill University. Students add contests, DSA progress, projects, internships, certificates and academic wins. A reviewer verifies each one, and a C++ engine turns approved work into EXP (0 to 10,000), category ranks and a live college leaderboard.
 
+## System architecture
+
+```mermaid
+flowchart TB
+  subgraph WEB["Website: React 18 + Vite (web/frontend)"]
+    P["Pages: Landing, Auth, Dashboard,<br/>Leaderboard/Search, Profile, Review"]
+    C["api/index.js: one fetch client + JWT"]
+    P --> C
+  end
+
+  subgraph API["FastAPI backend (web/backend/app)"]
+    R["routes: auth, students,<br/>achievements, admin"]
+    S["security.py: bcrypt + JWT, roles"]
+    V["validation.py: same rules as the DB"]
+    VF["verify.py: free auto-checks"]
+    VW["views.py: dashboard, leaderboard, profiles"]
+    EB["engine.py: child-process bridge + lock"]
+    DBM["db.py: SQLAlchemy Core tables"]
+    R --> S
+    R --> V
+    R --> VF
+    R --> VW
+    VW --> EB
+    R --> DBM
+  end
+
+  subgraph CPP["C++17 engine (engine/forge_engine.cpp), no STL containers"]
+    RE["RankEngine: weights, decay, EXP,<br/>score-once guard"]
+    SE["SearchEngine: tokenize, typo match,<br/>AND search, top-K"]
+    M["Models: Student (User.h),<br/>Achievement x6 (Achievement.h)"]
+    subgraph DS["ds/ (our own data structures)"]
+      AVL["AVLTree<br/>leaderboards"]
+      TR["Trie<br/>inverted index"]
+      MH["MinHeap<br/>top-K"]
+      HM["HashMap / HashSet"]
+      DA["DynArray"]
+      LQ["LinkedQueue<br/>review FIFO"]
+    end
+    RE --> AVL
+    RE --> HM
+    SE --> TR
+    SE --> MH
+    SE --> HM
+    M --> DA
+    M --> HM
+    RE --> M
+  end
+
+  DB[("SQLite now /<br/>Supabase Postgres later<br/>students, achievements, scores")]
+  EXT["Codeforces API + GitHub API<br/>(free, no key)"]
+
+  C -- "HTTP /api (Vite proxy in dev)" --> R
+  DBM --> DB
+  VF --> EXT
+  EB -- "stdin: LOAD, RANK, SEARCH<br/>stdout: rows ... END" --> CPP
 ```
-React website (web/frontend)
-        |  /api
-FastAPI backend (web/backend)  ---->  SQLite now, Supabase Postgres later (DATABASE_URL)
-        |  stdin / stdout
-C++ engine (engine/forge_engine.cpp)
-   RankEngine: AVL tree leaderboards, overall + 6 categories
-   SearchEngine: Trie + inverted index + edit distance + min-heap top-K
-```
+
+**How one approval flows:** student submits an achievement → it is saved as `pending` and auto-checked (Codeforces/GitHub) → reviewer approves (`UPDATE ... WHERE status='pending'`, so only one reviewer wins) → the API sends `LOAD` + `RANK` to the C++ engine → the engine rebuilds the AVL leaderboards from approved rows only → new EXP and rank are written to `scores` and shown on the site.
+
+The console version (`main.cpp` + `Cli.h`) uses the same headers, plus `Storage.h` (CSV) and `Verification.h` (LinkedQueue review queue).
 
 The C++ core uses **no STL containers**. Every data structure is our own (`ds/`). `std::string`, streams and `<cmath>` are used. Tests use STL only as an independent checker.
 
@@ -18,35 +69,57 @@ The C++ core uses **no STL containers**. Every data structure is our own (`ds/`)
 
 | Member | Role | Owns |
 |---|---|---|
-| **Pranjal Saraswat** | **Team lead, architecture, ranking and search engines, full-stack integration** | `ds/AVLTree.h`, `ds/Trie.h`, `ds/MinHeap.h`, `RankEngine.h`, `SearchEngine.h`, `engine/forge_engine.cpp`, `web/backend` (API, auth, engine bridge, reviewer API), `web/frontend` (all pages), database design, `tests/test_pipeline.cpp`, `tests/test_search.cpp`, `web/backend/tests` |
+| **Pranjal Saraswat** | **Team lead, architecture, ranking engine, search data structures, full-stack integration** | `ds/AVLTree.h`, `ds/Trie.h`, `ds/MinHeap.h`, `RankEngine.h`, `engine/forge_engine.cpp`, `web/backend` (API, auth, engine bridge, reviewer API), `web/frontend` (all pages), database design |
 | Saksham Singh | Core containers and data | `ds/DynArray.h`, `ds/HashMap.h`, `ds/HashSet.h`, `Storage.h` (CSV load/save, synthetic data generator), `tests/test_structures.cpp` |
 | Manya Singh | Achievement model and verification | `Achievement.h`, `ds/LinkedQueue.h`, `Verification.h`, first FastAPI verification module (used as the reference for the final reviewer API) |
-| Divyanshi Purohit | Student model and console app | `User.h` (User, Student, profile card), `Cli.h`, `main.cpp` |
+| Divyanshi Purohit | Student model, console app, search engine and testing | `User.h` (User, Student, profile card), `Cli.h`, `main.cpp`, `SearchEngine.h`, `tests/TestUtil.h`, `tests/test_pipeline.cpp`, `tests/test_search.cpp`, `web/backend/tests` |
+
+### How the work fits together
+
+```mermaid
+flowchart LR
+  SK["Saksham<br/>DynArray, HashMap, HashSet,<br/>Storage, structure tests"]
+  MA["Manya<br/>Achievement hierarchy,<br/>LinkedQueue, Verification"]
+  DV["Divyanshi<br/>User/Student, CLI,<br/>SearchEngine, test suites"]
+  PR["Pranjal (lead)<br/>AVLTree, Trie, MinHeap, RankEngine,<br/>engine server, FastAPI, website, DB"]
+  SK -- "containers used by every module" --> MA
+  SK --> DV
+  SK --> PR
+  MA -- "Achievement + score-once guard<br/>used by RankEngine" --> PR
+  PR -- "Trie + MinHeap<br/>used by SearchEngine" --> DV
+  DV -- "tests check pipeline, search, API" --> PR
+  MA -- "first FastAPI review module<br/>reference for reviewer API" --> PR
+```
+
+- **Interfaces first:** each member owns a header with a fixed public interface, so others could build on it without waiting (for example RankEngine only calls `Achievement::weightedPoints()` and `tryConsumeForScoring()`).
+- **Bottom-up order:** containers (Saksham) → models (Manya, Divyanshi) → engines (Pranjal, Divyanshi) → API and website (Pranjal).
+- **Tests as the safety net:** structure tests (Saksham) and pipeline, search and API tests (Divyanshi) check every member's code from the outside.
+- **Integration:** the lead connected the C++ engine to FastAPI, the database and the website.
+- **Branching:** the no-STL rewrite lives on `phase2-no-stl`, so the Phase 1 version on `main` stayed working.
 
 ### Pranjal Saraswat (lead)
 
 - **Architecture:** designed how the C++ engine, the Python API, the database and the website fit together, and the API contract all modules follow.
 - **AVL tree leaderboard (`ds/AVLTree.h`):** self-balancing BST with rotations and subtree sizes. Insert, erase and rank are O(log N); Top-K is O(K + log N).
 - **RankEngine (`RankEngine.h`):** weighted points, daily anti-spam decay, log normalisation to EXP, and the score-once guard. Uses a HashMap for the old EXP (O(1)) and the AVL tree to re-sort (O(log N)). Feeds one overall board and six category boards.
-- **Search engine (`SearchEngine.h`, `ds/Trie.h`, `ds/MinHeap.h`):**
-  - A Trie for prefix search on names, roll numbers, skills and headlines, with postings at each word (an inverted index).
-  - Edit distance (dynamic programming) so small typos still match.
-  - A binary min-heap that keeps the best K results in O(N log K).
+- **Search structures (`ds/Trie.h`, `ds/MinHeap.h`):**
+  - A Trie with postings at each word (an inverted index), used for prefix search on names, roll numbers, skills and headlines.
+  - A binary min-heap that keeps the best K results in O(N log K). Divyanshi's `SearchEngine.h` is built on both.
 - **Engine server (`engine/forge_engine.cpp`):** a long-running process that the API talks to over stdin and stdout (`LOAD`, `RANK`, `SEARCH`). It also computes the table as of seven days ago, for rank movement.
 - **Backend (`web/backend`):**
   - FastAPI with bcrypt passwords and JWT login, and student/reviewer roles.
   - Validation that mirrors the database rules.
   - The reviewer queue: oldest first, a conditional update so only one reviewer wins, and automatic proof checks through free Codeforces and GitHub APIs.
-  - The engine bridge, and API tests.
+  - The engine bridge.
 - **Website (`web/frontend`):** the "Arena" design, landing page, dashboard, leaderboard and search, profile and achievement forms, shareable card, and the reviewer page.
-- **OOP shown:** encapsulation (RankEngine and SearchEngine keep their maps and trees private), composition (RankEngine has-a AVLTree and HashMaps; SearchEngine has-a Trie, HashSet and MinHeap), templates (`MinHeap<T, Less>`), Rule of Three (Trie and AVL tree own nodes, copying is disabled), and separation of concerns across engine, API and UI.
+- **OOP shown:** encapsulation (RankEngine and SearchEngine keep their maps and trees private), composition (RankEngine has-a AVLTree and HashMaps), templates (`MinHeap<T, Less>`), Rule of Three (Trie and AVL tree own nodes, copying is disabled), and separation of concerns across engine, API and UI.
 
 ### Saksham Singh
 
 - **DSA:** `DynArray<T>` (doubling growth, amortised O(1) push), `HashMap<K,V>` (separate chaining, rehash at load factor 0.75, average O(1)), `HashSet<T>` (built on the HashMap).
 - **OOP:** class templates, Rule of Three with deep copy and safe self-assignment, composition (HashSet has-a HashMap), RAII destructors.
 - **Data:** `DataStore` owns every object and saves to CSV; the seeded generator gives the same data every run. The web seed (`web/database/generate_seed.py`) extends this generator.
-- **Tests:** 46 structure checks against STL as the reference.
+- **Tests:** `test_structures.cpp` (46 checks; the random AVL test uses STL as an independent reference).
 
 ### Manya Singh
 
@@ -56,8 +129,10 @@ The C++ core uses **no STL containers**. Every data structure is our own (`ds/`)
 
 ### Divyanshi Purohit
 
-- **OOP:** abstract `User` and derived `Student` (inheritance), a skills set and achievement list inside each student (composition), const-correct getters, and non-owning pointers.
-- **DSA:** uses HashSet for duplicate-free skills and DynArray for achievement lists.
+- **OOP:** abstract `User` and derived `Student` (inheritance), a skills set and achievement list inside each student (composition), const-correct getters, and non-owning pointers. `SearchEngine` has-a Trie, HashSet and HashMap (composition), keeps them private (encapsulation), and builds a MinHeap inside each search.
+- **Search engine (`SearchEngine.h`):** tokenizer (`c++` becomes `cpp`), weighted fields (name and roll above skills above the rest), AND search across words, edit distance (dynamic programming, O(m·n)) so small typos like "pyhton" still match, and min-heap top-K. Built on the lead's Trie and MinHeap.
+- **DSA:** HashSet for duplicate-free skills, DynArray for achievement lists, Trie postings as an inverted index.
+- **Testing:** `TestUtil.h` check helpers, `test_pipeline.cpp` (57 checks: scoring, decay, verification, ranks), `test_search.cpp` (20 checks), and the API tests in `web/backend/tests` (pytest on a temporary database with the real engine).
 - **App:** the menu-driven console program with input validation, the profile card, and the `--demo` mode. The profile card design carried over to the website's shareable card.
 
 ## Run everything

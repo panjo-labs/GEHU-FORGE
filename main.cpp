@@ -1,6 +1,6 @@
-// GEHU Forge 2 - entry point.
-//   forge.exe          -> interactive menu (loads/saves data/*.csv)
-//   forge.exe --demo   -> scripted demonstration, no typing needed
+// GEHU Forge 2 ka entry point.
+//   forge.exe          -> interactive menu (data/*.csv load/save)
+//   forge.exe --demo   -> scripted demo, typing ki zaroorat nahi
 #include <string>
 #include "Cli.h"
 

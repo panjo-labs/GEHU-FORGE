@@ -10,15 +10,8 @@
 #include "RankEngine.h"
 #include "Storage.h"
 
-// ============================================================================
-// App  -  the command-line interface (menu + input checking)
-// ============================================================================
-// SEPARATION OF CONCERNS: App only talks to the user and checks what they type.
-// The real work is done by the other modules:
-//    DataStore (objects + files)   VerificationService (queue)   RankEngine (EXP + ranks)
-//
-// App OWNS one DataStore, and creates one VerificationService and one RankEngine
-// with 'new' so they can be thrown away and rebuilt (for "Reset").
+// App: CLI menu + input check. Asli kaam DataStore, VerificationService aur RankEngine karte hain.
+// engine/verifier 'new' se bante hain taaki Reset par phenk ke dobara ban sakein.
 class App {
 private:
     DataStore store;
@@ -28,24 +21,19 @@ private:
     std::string achievementsPath;
     bool unsavedChanges;
 
-    // ------------------------------------------------------------------
-    // INPUT HELPERS  (every user typing goes through these)
-    // ------------------------------------------------------------------
-    // Read a whole line. Returns false when input has ended (Ctrl+Z / end of file).
-    // We read WHOLE LINES and convert ourselves, because 'cin >> number' breaks
-    // badly when the user types letters.
+    // Poori line padho (input khatam toh false). 'cin >> number' letters par toot jata hai,
+    // isliye line padh ke khud convert karte hain.
     static bool readLine(const std::string& prompt, std::string& out) {
         std::cout << prompt;
         if (!std::getline(std::cin, out)) return false;
         size_t b = out.find_first_not_of(" \t\r");
         size_t e = out.find_last_not_of(" \t\r");
-        out = (b == std::string::npos) ? "" : out.substr(b, e - b + 1);   // trim spaces
+        out = (b == std::string::npos) ? "" : out.substr(b, e - b + 1);
         return true;
     }
 
-    // Is the text a whole number like "42" or "-7"?
     static bool parseInt(const std::string& text, int& value) {
-        if (text.empty() || text.size() > 9) return false;                // 9 digits fit in int
+        if (text.empty() || text.size() > 9) return false;                // 9 digit int mein fit
         size_t i = (text[0] == '-') ? 1 : 0;
         if (i == text.size()) return false;
         for (size_t k = i; k < text.size(); ++k) {
@@ -55,7 +43,7 @@ private:
         return true;
     }
 
-    // Keep asking until the user types a number in [lo, hi]. false = input ended.
+    // [lo, hi] wala number aane tak poochte raho. false = input khatam.
     static bool readInt(const std::string& prompt, int lo, int hi, int& value) {
         std::string line;
         while (true) {
@@ -69,7 +57,7 @@ private:
         return s.find(',') != std::string::npos || s.find(';') != std::string::npos;
     }
 
-    // Keep asking until the text is non-empty and free of ',' and ';'.
+    // Khaali na ho aur ',' ';' na ho (CSV ke liye).
     static bool readText(const std::string& prompt, std::string& out, bool allowEmpty = false) {
         while (true) {
             if (!readLine(prompt, out)) return false;
@@ -79,7 +67,6 @@ private:
         }
     }
 
-    // "DD-MM-YYYY" check (format and simple ranges).
     static bool validDate(const std::string& d) {
         if (d.size() != 10 || d[2] != '-' || d[5] != '-') return false;
         int day = 0, month = 0, year = 0;
@@ -96,11 +83,8 @@ private:
         }
     }
 
-    // ------------------------------------------------------------------
-    // SETUP: (re)build the engine and queue from the objects in the DataStore
-    // ------------------------------------------------------------------
-    // Approved achievements are scored in file order; Pending ones join the
-    // FIFO queue in file order; Rejected ones are just kept.
+    // DataStore se engine + queue dobara banao: Approved score hote hain, Pending queue mein
+    // (dono file order mein), Rejected bas pade rehte hain.
     void rebuild() {
         delete engine;
         delete verifier;
@@ -121,9 +105,6 @@ private:
         rebuild();
     }
 
-    // ------------------------------------------------------------------
-    // OUTPUT HELPERS
-    // ------------------------------------------------------------------
     void printLeaderboard(int k) const {
         DynArray<RankKey> top = engine->getTopK(k);
         std::cout << "\n======================= GEHU FORGE LEADERBOARD =======================\n";
@@ -133,7 +114,7 @@ private:
         std::cout << "----------------------------------------------------------------------\n";
         if (top.size() == 0) std::cout << "  (nobody is ranked yet)\n";
         for (int i = 0; i < top.size(); ++i) {
-            const Student* s = store.findStudent(top[i].studentId);   // O(1) hash lookup
+            const Student* s = store.findStudent(top[i].studentId);
             std::cout << std::left << std::setw(6) << ("#" + std::to_string(i + 1))
                       << std::setw(8) << top[i].studentId
                       << std::setw(22) << (s ? s->getName() : "?")
@@ -162,9 +143,6 @@ private:
                   << " nodes needs about log2(N) levels)\n";
     }
 
-    // ------------------------------------------------------------------
-    // MENU ACTIONS
-    // ------------------------------------------------------------------
     void actionAddStudent() {
         std::string name, email, branch, github, leetcode, skillLine;
         int year = 0;
@@ -202,18 +180,20 @@ private:
         std::string title, date, proof, platform;
         if (!readInt("Student ID: ", 1, 999999, studentId)) return;
         if (store.findStudent(studentId) == nullptr) { std::cout << "  ! Unknown student id.\n"; return; }
-        std::cout << "  1) Competitive programming  2) Certification  3) Open source  4) Internship\n";
-        if (!readInt("Type (1-4): ", 1, 4, typeChoice)) return;
+        std::cout << "  1) Competitive programming  2) Certification  3) Open source / project  4) Internship\n"
+                  << "  5) DSA  6) Academic\n";
+        if (!readInt("Type (1-6): ", 1, 6, typeChoice)) return;
         if (!readText("Title: ", title)) return;
         if (!readDate("Date (DD-MM-YYYY): ", date)) return;
         if (!readInt("Raw score (-5000 to 100000): ", -5000, 100000, score)) return;
         if (!readText("Proof (link or file name): ", proof)) return;
-        std::string type = typeChoice == 1 ? "CODING" : typeChoice == 2 ? "CERT" : typeChoice == 3 ? "OSS" : "INTERN";
+        const char* types[] = {"CODING", "CERT", "OSS", "INTERN", "DSA", "ACAD"};
+        std::string type = types[typeChoice - 1];
         if (typeChoice == 1 && !readText("Platform (Codeforces/CodeChef/LeetCode/HackerRank/other): ", platform)) return;
 
         Achievement* a = createAchievement(type, store.newAchievementId(), studentId, title, date, score, proof, platform);
         if (a == nullptr || !store.addAchievement(a)) { delete a; std::cout << "  ! Could not add achievement.\n"; return; }
-        verifier->submit(a);                                   // joins the FIFO queue as Pending
+        verifier->submit(a);                                   // Pending ban ke FIFO queue mein
         unsavedChanges = true;
         std::cout << "  OK: achievement " << a->getId() << " is PENDING (position " << verifier->pendingCount()
                   << " in the review queue). It will not affect rankings until approved.\n";
@@ -224,7 +204,7 @@ private:
         if (!verifier->peekNextId(id)) { std::cout << "  The review queue is empty.\n"; return; }
         Achievement* a = store.findAchievement(id);
         std::cout << "\n--- Oldest submission in the queue (" << verifier->pendingCount() << " waiting) ---\n";
-        if (a != nullptr) a->display();                        // polymorphic call
+        if (a != nullptr) a->display();
         std::string answer;
         while (true) {
             if (!readLine("Approve (a), Reject (r) or Skip (s)? ", answer)) return;
@@ -282,9 +262,6 @@ public:
         delete verifier;
     }
 
-    // ------------------------------------------------------------------
-    // MAIN INTERACTIVE LOOP
-    // ------------------------------------------------------------------
     int run() {
         std::filesystem::create_directories("data");
         if (store.loadFromCsv(studentsPath, achievementsPath)) {
@@ -300,7 +277,7 @@ public:
         while (true) {
             printMenu();
             int choice = 0, id = 0, k = 0;
-            if (!readInt("Choose: ", 0, 10, choice)) { actionSave(); break; }   // input ended
+            if (!readInt("Choose: ", 0, 10, choice)) { actionSave(); break; }   // input khatam
 
             if (choice == 0) { actionSave(); std::cout << "Goodbye!\n"; break; }
             else if (choice == 1) printLeaderboard(10);
@@ -334,9 +311,7 @@ public:
         return 0;
     }
 
-    // ------------------------------------------------------------------
-    // SCRIPTED DEMO (no typing needed, never touches the saved files)
-    // ------------------------------------------------------------------
+    // Scripted demo - typing nahi chahiye, saved files ko chhoota nahi.
     int runDemo() {
         std::cout << "########## GEHU FORGE: SCRIPTED DEMO ##########\n";
         generateFreshData();
@@ -346,7 +321,7 @@ public:
 
         std::cout << "\n[2] A new student submits two achievements (they enter the FIFO queue as Pending).\n";
         Student* demo = new Student(store.newStudentId(), "Demo Student", "demo@example.edu", "CSE", 2027);
-        demo->addSkill("C++"); demo->addSkill("DSA"); demo->addSkill("C++");   // duplicate ignored
+        demo->addSkill("C++"); demo->addSkill("DSA"); demo->addSkill("C++");   // duplicate ignore hoga
         int demoId = demo->getStudentId();
         store.addStudent(demo);
         Achievement* big = createAchievement("INTERN", store.newAchievementId(), demoId, "Systems Intern",

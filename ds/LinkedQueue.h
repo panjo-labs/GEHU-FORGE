@@ -1,22 +1,8 @@
 #pragma once
 
-// ============================================================================
-// LinkedQueue<T>  -  our own FIFO queue (replaces std::queue)
-// ============================================================================
-// FIFO = First In, First Out, like a line at a ticket counter.
-//
-//   frontNode                       rearNode
-//      |                               |
-//      v                               v
-//   [ A ] -> [ B ] -> [ C ] -> nullptr          dequeue removes A, enqueue adds after C
-//
-// We keep BOTH a front and a rear pointer, so enqueue (at rear) and dequeue
-// (at front) are O(1). With only a front pointer, enqueue would have to walk
-// the whole list: O(n).
-//
-// RULE OF THREE: the queue owns heap nodes, so the destructor frees them.
-// Copy constructor and copy assignment are deleted: a copy would share the same
-// nodes and both queues would try to delete them (double free).
+// LinkedQueue<T>: apni FIFO queue (std::queue ki jagah).
+// front + rear dono pointer rakhe, isliye enqueue/dequeue dono O(1).
+// Nodes hamare hain: destructor free karta hai, copy delete ki (warna double free).
 template <class T>
 class LinkedQueue {
 private:
@@ -26,8 +12,8 @@ private:
         explicit Node(const T& d) : data(d), next(nullptr) {}
     };
 
-    Node* frontNode;   // oldest item (next to leave)
-    Node* rearNode;    // newest item (last to leave)
+    Node* frontNode;   // sabse purana (pehle niklega)
+    Node* rearNode;    // sabse naya
     int   count;
 
 public:
@@ -36,7 +22,6 @@ public:
     LinkedQueue(const LinkedQueue&) = delete;
     LinkedQueue& operator=(const LinkedQueue&) = delete;
 
-    // Destructor: delete every node still waiting in the queue.
     ~LinkedQueue() {
         while (frontNode != nullptr) {
             Node* old = frontNode;
@@ -45,32 +30,31 @@ public:
         }
     }
 
-    // Add to the back.  O(1)
+    // Peeche add.  O(1)
     void enqueue(const T& item) {
         Node* node = new Node(item);
-        if (rearNode == nullptr) {            // queue was empty
+        if (rearNode == nullptr) {
             frontNode = rearNode = node;
         } else {
-            rearNode->next = node;            // link after the current last node
+            rearNode->next = node;
             rearNode = node;
         }
         ++count;
     }
 
-    // Remove from the front and give the value back through 'out'.  O(1)
-    // Returns false (and touches nothing) when the queue is empty.
+    // Aage se nikaalo, value 'out' mein. Khaali queue par false.  O(1)
     bool dequeue(T& out) {
-        if (frontNode == nullptr) return false;     // never dereference nullptr
+        if (frontNode == nullptr) return false;
         Node* old = frontNode;
         out = old->data;
         frontNode = frontNode->next;
-        if (frontNode == nullptr) rearNode = nullptr;   // queue became empty
+        if (frontNode == nullptr) rearNode = nullptr;   // queue khaali ho gayi
         delete old;
         --count;
         return true;
     }
 
-    // Look at the front item without removing it.  O(1)
+    // Front dekho, hatao mat.  O(1)
     bool peek(T& out) const {
         if (frontNode == nullptr) return false;
         out = frontNode->data;

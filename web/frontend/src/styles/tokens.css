@@ -1,0 +1,50 @@
+/* Arena theme: sirf dark. Lime = action aur "you", coral = streak/gain, blue = info */
+:root {
+  color-scheme: dark;
+
+  --bg: #0e0f0c;
+  --panel: #16171a;
+  --panel-2: #1d1f23;
+  --panel-3: #24272c;
+  --line: #2a2d31;
+  --line-strong: #383c42;
+  --text: #f3f4ee;
+  --muted: #9a9e96;
+  --dim: #6f736b;
+
+  --lime: #b6f25a;
+  --lime-ink: #1b2608;
+  --lime-dark: #7fae36;
+  --lime-tint: rgba(182, 242, 90, 0.12);
+  --coral: #ff6b4a;
+  --coral-tint: rgba(255, 107, 74, 0.14);
+  --blue: #4d8dff;
+  --blue-tint: rgba(77, 141, 255, 0.14);
+  --danger: #ff5c5c;
+
+  --tier-candidate: #8a8f98;
+  --tier-specialist: #2ed3b7;
+  --tier-expert: #4d8dff;
+  --tier-master: #ff7a45;
+  --tier-grandmaster: #ffc93c;
+
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-ui: "Manrope", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, monospace;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-float: 0 18px 40px rgba(0, 0, 0, 0.45);
+
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 150ms;
+  --t-base: 250ms;
+
+  --sidebar: 84px;
+  --gutter: 24px;
+}

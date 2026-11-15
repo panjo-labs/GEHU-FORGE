@@ -9,9 +9,9 @@
 #include "ds/HashMap.h"
 #include "ds/HashSet.h"
 
-// ============================================================================
-// splitLine  -  cut "a,b,c" into ["a","b","c"]   (used when reading CSV files)
-// ============================================================================
+// CSV helpers + DataStore (saare objects ka owner) + DataGenerator (demo data).
+
+// "a,b,c" ko ["a","b","c"] mein todo.
 inline void splitLine(const std::string& line, char delim, DynArray<std::string>& out) {
     out.clear();
     std::string current;
@@ -19,14 +19,14 @@ inline void splitLine(const std::string& line, char delim, DynArray<std::string>
         if (line[i] == delim) {
             out.push_back(current);
             current.clear();
-        } else if (line[i] != '\r') {          // ignore Windows line endings
+        } else if (line[i] != '\r') {          // Windows wala CR ignore
             current += line[i];
         }
     }
-    out.push_back(current);                    // the last field has no delimiter after it
+    out.push_back(current);
 }
 
-// Commas would break the CSV format, so free text is cleaned before saving.
+// Comma CSV tod dega, isliye save se pehle text saaf karo.
 inline std::string cleanText(std::string s) {
     for (size_t i = 0; i < s.size(); ++i) {
         if (s[i] == ',' || s[i] == ';' || s[i] == '\n' || s[i] == '\r') s[i] = ' ';
@@ -34,16 +34,8 @@ inline std::string cleanText(std::string s) {
     return s;
 }
 
-// ============================================================================
-// DataStore  -  the single OWNER of every Student and Achievement object
-// ============================================================================
-// OWNERSHIP RULE: whoever calls 'new' must be answerable for 'delete'.
-// DataStore deletes everything in its destructor, so nobody else deletes:
-// Student, VerificationService and RankEngine only hold NON-OWNING pointers.
-// (This idea is called RAII: the object cleans up after itself.)
-//
-// Two HashMaps give O(1) lookup by id. Two DynArrays remember insertion order,
-// so the CSV files are always written in a stable, predictable order.
+// DataStore har Student/Achievement ka akela owner hai - destructor mein sab delete (RAII).
+// Baaki sab non-owning pointer rakhte hain. HashMap = O(1) lookup, DynArray = stable CSV order.
 class DataStore {
 private:
     HashMap<int, Student*> students;
@@ -61,7 +53,7 @@ public:
 
     ~DataStore() { clear(); }
 
-    // Delete every object and forget everything.  O(N + A)
+    // Saare objects delete karke sab bhool jao.  O(N + A)
     void clear() {
         for (int i = 0; i < studentOrder.size(); ++i) {
             Student** s = students.find(studentOrder[i]);
@@ -69,9 +61,8 @@ public:
         }
         for (int i = 0; i < achievementOrder.size(); ++i) {
             Achievement** a = achievements.find(achievementOrder[i]);
-            if (a != nullptr) delete *a;      // virtual destructor makes this safe
+            if (a != nullptr) delete *a;      // virtual destructor ki wajah se safe
         }
-        // Remove the (now dangling) pointers from the maps.
         for (int i = 0; i < studentOrder.size(); ++i) students.remove(studentOrder[i]);
         for (int i = 0; i < achievementOrder.size(); ++i) achievements.remove(achievementOrder[i]);
         studentOrder.clear();
@@ -80,7 +71,7 @@ public:
         nextAchievementId = 1;
     }
 
-    // Take ownership of 's'. Returns false (and does NOT take it) if the id exists.
+    // 's' ka ownership lo. Id pehle se ho toh false (ownership nahi liya).
     bool addStudent(Student* s) {
         if (s == nullptr || students.contains(s->getStudentId())) return false;
         students.put(s->getStudentId(), s);
@@ -89,7 +80,7 @@ public:
         return true;
     }
 
-    // Take ownership of 'a'. Returns false if the id exists or the owner is unknown.
+    // 'a' ka ownership lo. Id duplicate ya owner na mile toh false.
     bool addAchievement(Achievement* a) {
         if (a == nullptr || achievements.contains(a->getId())) return false;
         Student* owner = findStudent(a->getStudentId());
@@ -109,7 +100,7 @@ public:
         Achievement** a = achievements.find(id);
         return a != nullptr ? *a : nullptr;
     }
-    // const versions: usable from const member functions such as saveToCsv()
+    // const versions - saveToCsv() jaise const functions ke liye
     const Student* findStudent(int id) const {
         Student* const* s = students.find(id);
         return s != nullptr ? *s : nullptr;
@@ -124,14 +115,11 @@ public:
     int newStudentId() { return nextStudentId; }
     int newAchievementId() { return nextAchievementId; }
 
-    // Read-only access used by the verification service and the CLI.
     const HashMap<int, Achievement*>& achievementRegistry() const { return achievements; }
     const DynArray<int>& studentIds() const { return studentOrder; }
     const DynArray<int>& achievementIds() const { return achievementOrder; }
 
-    // ---------------------------------------------------------------------
-    // CSV SAVE.   O(N + A)
-    // ---------------------------------------------------------------------
+    // CSV save.  O(N + A)
     bool saveToCsv(const std::string& studentsPath, const std::string& achievementsPath) const {
         std::ofstream sf(studentsPath.c_str());
         std::ofstream af(achievementsPath.c_str());
@@ -155,8 +143,7 @@ public:
         for (int i = 0; i < achievementOrder.size(); ++i) {
             const Achievement* a = findAchievement(achievementOrder[i]);
             std::string platform;
-            // The platform exists only on CodingAchievement. Checking the type
-            // name avoids a dynamic_cast.
+            // Platform sirf CodingAchievement mein hai; typeName check se dynamic_cast nahi chahiye.
             if (a->typeName() == "CODING") {
                 platform = static_cast<const CodingAchievement*>(a)->getPlatform();
             }
@@ -168,9 +155,7 @@ public:
         return true;
     }
 
-    // ---------------------------------------------------------------------
-    // CSV LOAD.  Returns false if a file cannot be opened.  Bad rows are skipped.
-    // ---------------------------------------------------------------------
+    // CSV load. File na khule toh false; kharab rows skip.
     bool loadFromCsv(const std::string& studentsPath, const std::string& achievementsPath) {
         std::ifstream sf(studentsPath.c_str());
         std::ifstream af(achievementsPath.c_str());
@@ -180,11 +165,11 @@ public:
         std::string line;
         DynArray<std::string> f;
 
-        std::getline(sf, line);                         // skip the header row
+        std::getline(sf, line);                         // header skip
         while (std::getline(sf, line)) {
             if (line.empty()) continue;
             splitLine(line, ',', f);
-            if (f.size() < 8) continue;                 // malformed row
+            if (f.size() < 8) continue;
             Student* s = new Student(std::atoi(f[0].c_str()), f[1], f[2], f[3], std::atoi(f[4].c_str()));
             s->setGithub(f[5]);
             s->setLeetcode(f[6]);
@@ -193,18 +178,18 @@ public:
             for (int i = 0; i < skillList.size(); ++i) {
                 if (!skillList[i].empty()) s->addSkill(skillList[i]);
             }
-            if (!addStudent(s)) delete s;               // duplicate id: we still own it
+            if (!addStudent(s)) delete s;               // duplicate id: delete hum karenge
         }
 
-        std::getline(af, line);                         // skip the header row
+        std::getline(af, line);                         // header skip
         while (std::getline(af, line)) {
             if (line.empty()) continue;
             splitLine(line, ',', f);
             if (f.size() < 9) continue;
             Achievement* a = createAchievement(f[2], std::atoi(f[0].c_str()), std::atoi(f[1].c_str()),
                                                f[3], f[4], std::atoi(f[5].c_str()), f[7], f[6]);
-            if (a == nullptr) continue;                 // unknown type
-            if (f[8] == "Approved") a->approve();       // new objects start Pending
+            if (a == nullptr) continue;
+            if (f[8] == "Approved") a->approve();       // naya object Pending se shuru
             else if (f[8] == "Rejected") a->reject();
             if (!addAchievement(a)) delete a;
         }
@@ -212,14 +197,8 @@ public:
     }
 };
 
-// ============================================================================
-// DataGenerator  -  makes the synthetic (fake) demo dataset
-// ============================================================================
-// WHY OUR OWN RANDOM GENERATOR? std::rand() may give different numbers on
-// different compilers. A Linear Congruential Generator (LCG) is a tiny formula:
-//        state = (state * a + c) mod m
-// With the same seed it ALWAYS produces the same sequence, so the same
-// 100 students appear on every computer (reproducible results).
+// DataGenerator: fake demo dataset. Apna LCG (state = state*a + c mod m) taaki
+// same seed par har computer par same data aaye (std::rand() par bharosa nahi).
 class DataGenerator {
 private:
     unsigned long state;
@@ -228,7 +207,7 @@ private:
         state = (state * 1103515245UL + 12345UL) % 2147483648UL;   // m = 2^31
         return state;
     }
-    // A number in [0, n)
+    // [0, n) mein number
     int pick(int n) { return static_cast<int>((nextRandom() >> 8) % static_cast<unsigned long>(n)); }
 
     static std::string twoDigits(int v) { return (v < 10 ? "0" : "") + std::to_string(v); }
@@ -282,7 +261,7 @@ private:
 
                 int roll = pick(100);
                 if (roll < 80) a->approve();
-                else if (roll >= 92) a->reject();       // 80..91 stay Pending
+                else if (roll >= 92) a->reject();       // 80..91 Pending rehte hain
                 if (!store.addAchievement(a)) delete a;
                 ++achId;
             }
@@ -290,8 +269,7 @@ private:
     }
 
 public:
-    // Fill 'store' with 'studentCount' fake students and 1-3 achievements each.
-    // About 80% Approved, 12% Pending, 8% Rejected. Same seed => same data.
+    // Har student ke 1-3 achievements: ~80% Approved, 12% Pending, 8% Rejected.
     static void generate(DataStore& store, int studentCount = 100, unsigned seed = 2026) {
         DataGenerator gen(seed);
         gen.fill(store, studentCount);

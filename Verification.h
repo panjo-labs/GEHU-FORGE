@@ -4,26 +4,14 @@
 #include "ds/LinkedQueue.h"
 #include "ds/HashMap.h"
 
-// ============================================================================
-// VerificationService  -  the "staging area" for new achievements
-// ============================================================================
-// FLOW:   student submits -> submit() puts the id in a FIFO queue
-//         reviewer calls reviewNext() -> oldest submission is approved/rejected
-//
-// SEPARATION OF CONCERNS: this class only decides WHO is reviewed next and
-// records the decision. It does NOT calculate points (RankEngine does that).
-//
-// WHY STORE IDs AND NOT POINTERS? An id is just a number: it can never dangle.
-// The real object is found through the registry (a HashMap, O(1) lookup).
-//
-// FIFO only decides the ORDER of review. It does not mean "first = approved".
+// VerificationService: naye submissions ki FIFO queue. Sirf review ka order + decision,
+// points RankEngine deta hai. Pointer nahi, id rakhte hain - id kabhi dangle nahi hoti.
 class VerificationService {
 private:
-    LinkedQueue<int> pending;   // achievement ids waiting for review, oldest at front
+    LinkedQueue<int> pending;   // review ke liye ids, sabse purana front par
 
 public:
-    // Add a Pending achievement to the back of the queue.  O(1)
-    // Returns false if the achievement is null or already reviewed.
+    // Pending achievement ko queue ke peeche daalo. O(1)
     bool submit(Achievement* a) {
         if (a == nullptr) return false;
         if (a->getStatus() != VerificationStatus::Pending) return false;
@@ -31,12 +19,12 @@ public:
         return true;
     }
 
-    // Take the OLDEST id, look the object up, approve or reject it.
-    // Returns the reviewed object, or nullptr if the queue is empty / id unknown.
+    // Sabse purani id nikaalo, registry se object dhundo (O(1)), approve/reject karo.
+    // Queue khaali ya id na mile toh nullptr.
     Achievement* reviewNext(const HashMap<int, Achievement*>& registry, bool approve) {
         int id = 0;
-        if (!pending.dequeue(id)) return nullptr;          // empty queue
-        Achievement* const* found = registry.find(id);     // O(1)
+        if (!pending.dequeue(id)) return nullptr;
+        Achievement* const* found = registry.find(id);
         if (found == nullptr || *found == nullptr) return nullptr;
         Achievement* a = *found;
         if (approve) a->approve();

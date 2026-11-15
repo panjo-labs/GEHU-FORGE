@@ -8,3 +8,13 @@
 build/
 bin/
 *.tmp.csv
+
+# Study guides and generated docs stay local
+study_material/
+docs/guides/
+docs/*Guide*.pdf
+docs/*.docx
+docs/*Report*.pdf
+docs/*Architecture*.pdf
+docs/ui-mockup.html
+.claude/

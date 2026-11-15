@@ -1,6 +1,6 @@
 #pragma once
-// Tiny test helper: CHECK(condition) counts passes/failures and prints failures.
-// Tests are the ONLY place where STL containers are allowed (as an independent "oracle").
+// Chhota test helper: CHECK(cond) pass/fail ginta hai, fail print karta hai.
+// STL sirf tests mein allowed hai (independent "oracle" ke roop mein).
 #include <iostream>
 
 static int g_checks = 0;
